@@ -18,10 +18,10 @@ setup(
     install_requires=[
         'XBlock',
     ],
-    # Đăng ký module với tên định danh mới: toeic
+    # ĐÂY LÀ PHẦN QUAN TRỌNG NHẤT: Đăng ký module với edX
     entry_points={
         'xblock.v1': [
-            'toeic = myxblock.myxblock:MyXBlock',
+            'myxblock = myxblock.myxblock:MyXBlock',
         ]
     },
     # Khai báo để edX cho phép tải các file giao diện Vue của bạn
