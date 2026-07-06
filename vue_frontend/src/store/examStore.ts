@@ -1,25 +1,20 @@
 /// <reference types="vite/client" />
 import { defineStore } from 'pinia';
 
-// ============================================================================
-// HÀM BỔ SUNG: BẢO MẬT API CHO EDX
-// ============================================================================
-// Lấy "thẻ thông hành" bảo mật từ cookie của edX
 const getCsrfToken = () => {
   const match = document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)'));
   return match ? match[2] : '';
 };
 
-// Tạo cấu hình Header chuẩn cho mọi gói tin gửi đi
 const getEdxHeaders = () => ({
   'Content-Type': 'application/json',
   'X-CSRFToken': getCsrfToken()
 });
 
-// Khai báo Interface chuẩn
 export interface ExamProgress {
   answers: Record<string, any>;
   audioCurrentTime: number;
+  audioProgressMap?: Record<string, number>; 
   isSubmitted: boolean;
   hasStarted: boolean;
   endTime: number | null;
@@ -27,20 +22,17 @@ export interface ExamProgress {
   scoreResult?: any;
 }
 
-// ============================================================================
-// EXAM STORE (DUAL ENGINE: LOCAL & PYTHON EDX)
-// ============================================================================
 export const useExamStore = defineStore('exam', {
   state: () => ({
-    // Cấu hình môi trường edX Runtime (Tiếp nhận từ main.ts)
     edxConfig: {
       mode: 'student' as 'student' | 'teacher',
       getUrl: '',
       saveUrl: '',
-      submitUrl: ''
+      submitUrl: '',
+      downloadUrl: '',
+      heartbeatUrl: '' // 🔥 BỔ SUNG: URL nhận diện từ Python
     },
 
-    // Cấu hình môi trường thi UI
     config: {
       examId: 'default' as string,
       mode: 'exam' as 'exam' | 'exercise',
@@ -50,32 +42,45 @@ export const useExamStore = defineStore('exam', {
       hasTimer: true
     },
     
-    // Dữ liệu gốc
-    examSettings: {} as any,
-    examDataRaw: {} as any, // Lưu trữ tạm data thô (hỗ trợ custom mode)
+    examSettings: {
+      globalListeningAudio: '',
+      isTimeLimitEnabled: false,
+      isShowAnswerEnabled: true,
+      isAudioSeekEnabled: false,
+      timeLimitSeconds: 7200
+    } as any,
+    examDataRaw: {} as any, 
+    builderMode: 'traditional' as 'traditional' | 'custom',
     
-    // Dữ liệu UI
+    saveStatus: 'idle' as 'idle' | 'saving' | 'success' | 'error',
+    _debounceTimer: null as ReturnType<typeof setTimeout> | null,
+    _isSubscribed: false,
+    
     audioUrl: '' as string,
     audioCurrentTime: 0 as number,
+    audioProgressMap: {} as Record<string, number>, 
     parts: [] as any[],
     activePartIndex: 0,
     activeQuestionId: '' as string,
     
-    // Dữ liệu người dùng & Thời gian
     userAnswers: {} as Record<string, any>, 
     timeRemaining: 0,
     endTime: null as number | null, 
     
-    // Trạng thái hệ thống
     hasStarted: false,
     isRunning: false,
     timerInterval: null as ReturnType<typeof setInterval> | null,
-    isLoading: true,
+    
+    isLoading: true, 
     isSubmitted: false,
     scrollTrigger: 0,
     
-    // Kết quả trả về
-    scoreResult: null as any 
+    scoreResult: null as any,
+
+    // 🔥 BỔ SUNG CƠ CHẾ KICK ĐA THIẾT BỊ
+    deviceToken: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
+    heartbeatInterval: null as ReturnType<typeof setInterval> | null,
+    isKickedOut: false
   }),
   
   getters: {
@@ -94,8 +99,7 @@ export const useExamStore = defineStore('exam', {
     totalQuestions(): number { return this.questionMap.length; },
     
     correctAnswersCount: (state) => {
-      if (state.scoreResult?.correctCount !== undefined) return state.scoreResult.correctCount;
-      return Object.values(state.userAnswers).filter((ans: any) => ans.isCorrect).length;
+      return state.scoreResult?.correctCount || 0;
     },
     
     answeredCount: (state) => Object.keys(state.userAnswers).length,
@@ -111,22 +115,25 @@ export const useExamStore = defineStore('exam', {
   },
 
   actions: {
-    // ==========================================
-    // CẤU HÌNH API RUNTIME EDX
-    // ==========================================
     setEdxRuntime(config: any) {
       this.edxConfig = { ...this.edxConfig, ...config };
     },
 
-    // ==========================================
-    // LƯU ĐỀ THI LÊN EDX (GIÁO VIÊN)
-    // ==========================================
+    sanitizeExamData(rawData: any) {
+      const sanitized = rawData ? { ...rawData } : {};
+      for (let i = 1; i <= 7; i++) {
+        sanitized[i] = Array.isArray(sanitized[i]) ? sanitized[i] : [];
+      }
+      sanitized.custom = Array.isArray(sanitized.custom) ? sanitized.custom : [];
+      return sanitized;
+    },
+
     async saveToEdx(payload: any) {
       if (this.edxConfig.saveUrl) {
         try {
           const res = await fetch(this.edxConfig.saveUrl, {
             method: 'POST',
-            headers: getEdxHeaders(), // <--- Bổ sung Headers bảo mật
+            headers: getEdxHeaders(),
             body: JSON.stringify(payload)
           });
           if (!res.ok) throw new Error("Edx từ chối kết nối");
@@ -139,15 +146,7 @@ export const useExamStore = defineStore('exam', {
       }
     },
 
-    // ==========================================
-    // KHỞI TẠO BÀI THI & NẠP DỮ LIỆU
-    // ==========================================
     async initExam(examId: string = 'default') {
-      // ---------------------------------------------------------
-      // TRẠM GÁC SỐ 2: Kiểm tra cấu hình URL bên trong Store
-      console.log("🛑 [TEST 2] Cấu hình edxConfig hiện tại:", this.edxConfig);
-      // ---------------------------------------------------------
-
       if (this.timerInterval) {
         clearInterval(this.timerInterval);
         this.timerInterval = null;
@@ -157,8 +156,10 @@ export const useExamStore = defineStore('exam', {
       this.isSubmitted = false;
       this.userAnswers = {};
       this.audioCurrentTime = 0;
+      this.audioProgressMap = {};
       this.scoreResult = null;
       this.endTime = null;
+      this.isKickedOut = false; // Reset cờ Kicked khi khởi tạo lại đề thi
 
       this.isLoading = true;
       this.config.examId = examId;
@@ -167,10 +168,9 @@ export const useExamStore = defineStore('exam', {
         let rawData: any = null;
 
         if (this.edxConfig.getUrl) {
-          // [MÔI TRƯỜNG PYTHON] Đọc từ API edX
           const res = await fetch(this.edxConfig.getUrl, { 
             method: 'POST', 
-            headers: getEdxHeaders(), // <--- Bổ sung Headers bảo mật
+            headers: getEdxHeaders(),
             body: JSON.stringify({}) 
           });
           
@@ -181,7 +181,6 @@ export const useExamStore = defineStore('exam', {
             rawData = await res.json();
           }
           
-          // Tái cấu trúc progress từ user_state của edX
           if (rawData.userAnswers && Object.keys(rawData.userAnswers).length > 0) {
             rawData.progress = {
               answers: rawData.userAnswers,
@@ -190,25 +189,43 @@ export const useExamStore = defineStore('exam', {
             };
           }
         } else {
-          // [MÔI TRƯỜNG LOCAL] Đọc file tĩnh và LocalStorage
           const res = await fetch('/exam_data.json');
           if (!res.ok) throw new Error("Yêu cầu file exam_data.json trong thư mục public/");
           rawData = await res.json();
-          
-          const localProgress = localStorage.getItem('toeic_progress_' + examId);
-          if (localProgress) rawData.progress = JSON.parse(localProgress);
         }
 
-        // Cập nhật Settings
-        this.examSettings = rawData.examSettings || {};
-        this.examDataRaw = rawData;
+        const draftKey = `xblock_exam_draft_${examId}`;
+        const localDraft = localStorage.getItem(draftKey);
+        
+        if (localDraft) {
+          try {
+            const parsedDraft = JSON.parse(localDraft);
+            if (!rawData.progress?.isSubmitted) {
+              rawData.progress = parsedDraft;
+            } else {
+              localStorage.removeItem(draftKey);
+            }
+          } catch (e) {
+            console.error("Lỗi parse dữ liệu nháp:", e);
+          }
+        }
+
+        const fetchedSettings = rawData.examSettings || {};
+        this.examSettings = {
+          globalListeningAudio: fetchedSettings.globalListeningAudio || '',
+          isTimeLimitEnabled: !!fetchedSettings.isTimeLimitEnabled,
+          isShowAnswerEnabled: fetchedSettings.isShowAnswerEnabled !== undefined ? !!fetchedSettings.isShowAnswerEnabled : true,
+          isAudioSeekEnabled: !!fetchedSettings.isAudioSeekEnabled,
+          timeLimitSeconds: Number(fetchedSettings.timeLimitSeconds) || 7200
+        };
+
+        this.builderMode = rawData.builderMode || 'traditional';
+        this.examDataRaw = this.sanitizeExamData(rawData.examData); 
         this.audioUrl = this.examSettings.globalListeningAudio || '';
 
-        // Phân rã dữ liệu từ JSON thành mảng Parts (Ưu tiên hỗ trợ cả 2 chế độ)
-        const builderMode = rawData.builderMode || 'traditional';
-        const examDataMap = rawData.examData || {};
+        const examDataMap = this.examDataRaw;
 
-        if (builderMode === 'custom' && examDataMap.custom) {
+        if (this.builderMode === 'custom' && examDataMap.custom) {
           this.parts = examDataMap.custom.map((p: any) => ({
             id: p.id,
             title: p.name,
@@ -226,15 +243,25 @@ export const useExamStore = defineStore('exam', {
           }));
         }
 
-        // Phục hồi Tiến độ học viên (Progress)
         const progress = rawData.progress as ExamProgress | null;
         if (progress) {
           this.userAnswers = progress.answers || {};
           this.audioCurrentTime = progress.audioCurrentTime || 0;
+          this.audioProgressMap = progress.audioProgressMap || {};
+          
+          if (this.audioCurrentTime > 0 && Object.keys(this.audioProgressMap).length === 0) {
+            this.audioProgressMap['global'] = this.audioCurrentTime;
+          }
+
           this.isSubmitted = progress.isSubmitted || false;
           this.hasStarted = progress.hasStarted || false;
           this.endTime = progress.endTime || null;
-          if (progress.timeRemaining !== undefined) this.timeRemaining = progress.timeRemaining;
+          
+          if (progress.timeRemaining !== undefined) {
+            this.timeRemaining = progress.timeRemaining;
+          } else {
+            this.timeRemaining = this.examSettings.timeLimitSeconds || 0;
+          }
           
           if (progress.scoreResult) {
             this.scoreResult = progress.scoreResult;
@@ -243,20 +270,22 @@ export const useExamStore = defineStore('exam', {
           this.timeRemaining = this.examSettings.timeLimitSeconds || 0;
         }
 
-        // Tính lại thời gian cho chống gian lận
         if (this.config.mode === 'exam' && this.endTime && !this.isSubmitted) {
           this.timeRemaining = Math.max(0, Math.floor((this.endTime - Date.now()) / 1000));
         }
 
-        // Kích hoạt câu đầu tiên
         if (this.questionMap.length > 0 && !this.activeQuestionId) {
           this.activeQuestionId = this.questionMap[0].id;
           this.activePartIndex = this.questionMap[0].partIndex;
         }
         
-        // Bắt đầu đếm giờ nếu cần (đang làm dở)
         if (!this.isSubmitted && this.config.hasTimer && this.hasStarted) {
           this.startTimer();
+        }
+
+        // 🔥 BẮT ĐẦU VÒNG LẶP KIỂM SOÁT ĐĂNG NHẬP
+        if (this.edxConfig.mode === 'student' && !this.isSubmitted) {
+          this.startHeartbeat();
         }
 
       } catch (error) {
@@ -266,9 +295,6 @@ export const useExamStore = defineStore('exam', {
       }
     },
 
-    // ==========================================
-    // ĐIỀU HƯỚNG BÀI THI
-    // ==========================================
     jumpToPart(index: number) {
       if (index >= 0 && index < this.parts.length) {
         this.activePartIndex = index;
@@ -288,14 +314,28 @@ export const useExamStore = defineStore('exam', {
       }
     },
 
-    // ==========================================
-    // LƯU ĐÁP ÁN & ĐỒNG BỘ PYTHON/LOCAL
-    // ==========================================
-    saveAnswer(questionId: string, answerId: string, isCorrect: boolean = false) {
+    saveAnswer(questionId: string, answerData: any) {
       if (this.isSubmitted) return; 
-      
-      this.userAnswers[questionId] = { questionId, selectedAnswer: answerId, isCorrect };
+      this.userAnswers[questionId] = answerData;
       this.syncProgressToBackend();
+    },
+
+    saveAudioProgress(url: string, time: number) {
+      if (this.isSubmitted || !this.hasStarted) return;
+      const cleanUrl = url || 'global';
+      const lastRecordedTime = this.audioProgressMap[cleanUrl] || 0;
+      
+      this.audioProgressMap[cleanUrl] = time;
+      this.audioCurrentTime = time;
+
+      if (Math.floor(time) !== Math.floor(lastRecordedTime) && Math.floor(time) % 2 === 0) {
+        this.syncProgressToBackend();
+      }
+    },
+
+    getAudioProgress(url: string): number {
+      const cleanUrl = url || 'global';
+      return this.audioProgressMap[cleanUrl] || 0;
     },
 
     async syncProgressToBackend() {
@@ -306,18 +346,13 @@ export const useExamStore = defineStore('exam', {
         endTime: this.endTime,
         hasStarted: this.hasStarted,
         audioCurrentTime: this.audioCurrentTime,
+        audioProgressMap: this.audioProgressMap,
         scoreResult: this.scoreResult
       };
 
-      if (!this.edxConfig.getUrl) {
-        localStorage.setItem('toeic_progress_' + this.config.examId, JSON.stringify(payload));
-      }
-      // edX mặc định không gọi API lưu quá thường xuyên tránh quá tải, tiến độ sẽ được nộp tập trung tại submitExam.
+      localStorage.setItem(`xblock_exam_draft_${this.config.examId}`, JSON.stringify(payload));
     },
 
-    // ==========================================
-    // ĐỒNG HỒ CHỐNG GIAN LẬN THỜI GIAN
-    // ==========================================
     startTimer() {
       this.isRunning = true; 
       this.hasStarted = true;
@@ -338,7 +373,7 @@ export const useExamStore = defineStore('exam', {
         if (this.timeRemaining <= 0) {
           this.stopTimer();
           if(!this.isSubmitted) this.submitExam();
-        } else if (this.timeRemaining % 10 === 0) {
+        } else if (this.timeRemaining % 5 === 0) {
           this.syncProgressToBackend();
         }
       }, 1000);
@@ -353,38 +388,53 @@ export const useExamStore = defineStore('exam', {
       }
     },
 
-    // ==========================================
-    // NỘP BÀI VÀ GHI ĐIỂM SỔ ĐIỂM EDX (GRADEBOOK)
-    // ==========================================
     async submitExam() {
       this.stopTimer();
       this.isSubmitted = true;
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+      }
 
       let correctCount = 0;
       let totalCount = 0;
       let totalScore = 0;
       const details: Record<string, any> = {};
 
-      // Thuật toán chấm điểm cục bộ
       this.parts.forEach((part: any) => {
         if (!part.questions) return;
         part.questions.forEach((q: any) => {
           totalCount++;
           const qIdStr = String(q.id);
           const rawAns = this.userAnswers[qIdStr];
-          const userAnswer = typeof rawAns === 'object' ? rawAns?.selectedAnswer : rawAns;
-          const correctAnswer = q.correctAnswer;
-          const isCorrect = userAnswer === correctAnswer;
+          
+          let userAnswer = typeof rawAns === 'object' && rawAns !== null && rawAns.selectedAnswer 
+            ? rawAns.selectedAnswer 
+            : rawAns;
+            
+          let isCorrect = false;
+
+          if (q.type === 'matching' && typeof userAnswer === 'object') {
+            isCorrect = true;
+            (q.pairs || []).forEach((p: any) => {
+              if (userAnswer[p.left] !== p.right) isCorrect = false;
+            });
+          } else if (q.type === 'text_input') {
+            const cleanUserAns = String(userAnswer || '').trim().toLowerCase();
+            const cleanTarget = String(q.correctAnswer || '').trim().toLowerCase();
+            isCorrect = cleanUserAns === cleanTarget;
+          } else {
+            isCorrect = userAnswer === q.correctAnswer;
+          }
           
           if (isCorrect && userAnswer) correctCount++;
 
-          // Xử lý hệ số điểm cho Custom mode
           const point = (q.scoreEnabled && !isNaN(q.score)) ? Number(q.score) : 1;
           if (isCorrect && userAnswer) totalScore += point;
 
           details[qIdStr] = {
             userAnswer: userAnswer || null,
-            correctAnswer: correctAnswer || null,
+            correctAnswer: q.correctAnswer || null,
             isCorrect: isCorrect,
             score: isCorrect ? point : 0
           };
@@ -398,18 +448,18 @@ export const useExamStore = defineStore('exam', {
         details: details 
       };
 
-      // Ghi nhận trạng thái hoàn thành vĩnh viễn
       this.syncProgressToBackend();
+      localStorage.removeItem(`xblock_exam_draft_${this.config.examId}`);
 
       if (this.edxConfig.submitUrl) {
         try {
           await fetch(this.edxConfig.submitUrl, {
             method: 'POST',
-            headers: getEdxHeaders(), // <--- Bổ sung Headers bảo mật
+            headers: getEdxHeaders(),
             body: JSON.stringify({
               userAnswers: this.userAnswers,
               score: totalScore,
-              maxScore: totalCount // Định mức quy chuẩn tổng điểm tối đa
+              maxScore: totalCount
             })
           });
         } catch (error) {
@@ -417,6 +467,49 @@ export const useExamStore = defineStore('exam', {
         }
       } else {
         console.info(`Local Dev: Đã nộp bài giả lập. Điểm thi đạt: ${totalScore}/${totalCount}`);
+      }
+    },
+
+    // ==========================================
+    // 🔥 HÀM MỚI: QUẢN LÝ NHỊP TIM ĐỘC QUYỀN
+    // ==========================================
+    async startHeartbeat() {
+      // 1. Gửi token cướp quyền lúc vừa mở web
+      await this.pingDeviceToken(true);
+      
+      // 2. Cứ 15 giây ping 1 lần để kiểm tra xem có bị chiếm quyền không
+      if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = setInterval(() => {
+        this.pingDeviceToken(false);
+      }, 15000);
+    },
+
+    async pingDeviceToken(isInitialLoad = false) {
+      if (!this.edxConfig.heartbeatUrl || this.isSubmitted || this.isKickedOut) return;
+      
+      try {
+        const res = await fetch(this.edxConfig.heartbeatUrl, {
+          method: 'POST',
+          headers: getEdxHeaders(),
+          body: JSON.stringify({
+            deviceToken: this.deviceToken,
+            isInitialLoad: isInitialLoad
+          })
+        });
+        
+        if (res.ok) {
+          const result = await res.json();
+          // Nếu Python báo KICK, lập tức khóa trạng thái
+          if (result.action === 'kick') {
+            this.isKickedOut = true;
+            if (this.heartbeatInterval) {
+              clearInterval(this.heartbeatInterval);
+              this.heartbeatInterval = null;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Lỗi kiểm tra nhịp tim", error);
       }
     }
   }

@@ -1,7 +1,8 @@
 import pkg_resources
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
-from xblock.fields import Dict, String, Scope
+from xblock.fields import Dict, String, Scope, Boolean
+from webob import Response  # Thư viện xử lý trả về tệp tin
 
 class MyXBlock(XBlock):
     # ==========================================
@@ -9,10 +10,13 @@ class MyXBlock(XBlock):
     # ==========================================
     display_name = String(
         display_name="Display Name",
-        default="Toeic", # Tên mặc định sẽ hiển thị thay cho chuỗi ID
+        default="Toeic Exam", 
         scope=Scope.settings,
         help="Tên hiển thị của học liệu trên giao diện."
     )
+    
+    has_score = True
+    icon_class = 'problem'
 
     # ==========================================
     # 1. KHAI BÁO CƠ SỞ DỮ LIỆU CỦA EDX
@@ -20,6 +24,7 @@ class MyXBlock(XBlock):
     exam_data_json = Dict(default={}, scope=Scope.settings, help="Cấu trúc câu hỏi")
     exam_settings_json = Dict(default={}, scope=Scope.settings, help="Cài đặt bài thi")
     builder_mode = String(default="traditional", scope=Scope.settings)
+    
     user_progress = Dict(default={}, scope=Scope.user_state, help="Tiến độ học viên")
 
     def resource_string(self, path):
@@ -36,12 +41,12 @@ class MyXBlock(XBlock):
         frag.add_css(self.resource_string("static/css/toeic_builder_bundle.css"))
         frag.add_javascript(self.resource_string("static/js/toeic_builder_bundle.js"))
         
-        # BƠM TRỰC TIẾP URL VÀO VUE.JS
         frag.initialize_js('ToeicAppInit', {
             'mode': 'teacher',
             'get_url': self.runtime.handler_url(self, 'get_exam_data'),
             'save_url': self.runtime.handler_url(self, 'save_exam_data'),
-            'submit_url': self.runtime.handler_url(self, 'submit_exam')
+            'submit_url': self.runtime.handler_url(self, 'submit_exam'),
+            'download_url': self.runtime.handler_url(self, 'download_export_file')
         })
         return frag
 
@@ -52,11 +57,13 @@ class MyXBlock(XBlock):
         frag.add_css(self.resource_string("static/css/toeic_builder_bundle.css"))
         frag.add_javascript(self.resource_string("static/js/toeic_builder_bundle.js"))
         
+        # 🔥 ĐÃ BỔ SUNG: Truyền heartbeat_url sang giao diện học viên
         frag.initialize_js('ToeicAppInit', {
             'mode': 'student',
             'get_url': self.runtime.handler_url(self, 'get_exam_data'),
             'save_url': '',
-            'submit_url': self.runtime.handler_url(self, 'submit_exam')
+            'submit_url': self.runtime.handler_url(self, 'submit_exam'),
+            'heartbeat_url': self.runtime.handler_url(self, 'check_concurrent_login')
         })
         return frag
 
@@ -65,11 +72,15 @@ class MyXBlock(XBlock):
     # ==========================================
     @XBlock.json_handler
     def get_exam_data(self, data, suffix=''):
+        answers = self.user_progress.get('answers', {}) if 'answers' in self.user_progress else self.user_progress
+        is_submitted = self.user_progress.get('isSubmitted', False) if isinstance(self.user_progress, dict) else False
+
         return {
             "examData": self.exam_data_json,
             "examSettings": self.exam_settings_json,
             "builderMode": self.builder_mode,
-            "userAnswers": self.user_progress
+            "userAnswers": answers,
+            "isSubmitted": is_submitted
         }
 
     @XBlock.json_handler
@@ -81,12 +92,65 @@ class MyXBlock(XBlock):
 
     @XBlock.json_handler
     def submit_exam(self, data, suffix=''):
-        self.user_progress = data.get('userAnswers', {})
+        # Bảo toàn token quản lý thiết bị khi nộp bài
+        current_token = self.user_progress.get('active_device_token') if isinstance(self.user_progress, dict) else None
+        
+        self.user_progress = {
+            "answers": data.get('userAnswers', {}),
+            "isSubmitted": True,
+            "active_device_token": current_token
+        }
+        
         score = data.get('score', 0)
         max_score = data.get('maxScore', 1)
-        # Ghi điểm vào Sổ điểm (Gradebook) của edX
+        
         self.runtime.publish(self, 'grade', {
             'value': score,
             'max_value': max_score
         })
+        
         return {"status": "success", "score": score}
+
+    # ==========================================
+    # 4. API TẢI TỆP TIN XUYÊN SANDBOX
+    # ==========================================
+    @XBlock.handler
+    def download_export_file(self, request, suffix=''):
+        file_content = request.POST.get('file_content', '')
+        file_name = request.POST.get('file_name', 'export.txt')
+        mime_type = request.POST.get('mime_type', 'text/plain')
+
+        encoded_content = '\ufeff' + file_content
+        byte_content = encoded_content.encode('utf-8')
+
+        response = Response(byte_content)
+        response.content_type = f"{mime_type}; charset=utf-8"
+        response.content_disposition = f'attachment; filename="{file_name}"'
+        
+        return response
+
+    # ==========================================
+    # 🔥 5. API CHỐNG ĐĂNG NHẬP ĐỒNG THỜI (HEARTBEAT)
+    # ==========================================
+    @XBlock.json_handler
+    def check_concurrent_login(self, data, suffix=''):
+        client_token = data.get('deviceToken')
+        is_initial_load = data.get('isInitialLoad', False)
+        
+        # Đảm bảo user_progress là dictionary
+        if not isinstance(self.user_progress, dict):
+            self.user_progress = {}
+
+        current_active_token = self.user_progress.get('active_device_token')
+
+        # Lần đầu mở bài -> Lấy quyền thiết bị
+        if is_initial_load or not current_active_token:
+            self.user_progress['active_device_token'] = client_token
+            return {"status": "ok", "action": "allow"}
+
+        # Thiết bị hiện tại bị khác với thiết bị lưu trong DB -> Đã bị đăng nhập nơi khác
+        if current_active_token != client_token:
+            return {"status": "conflict", "action": "kick"}
+
+        # Token khớp -> Cấp phép làm tiếp
+        return {"status": "ok", "action": "allow"}
