@@ -55,13 +55,11 @@ const props = defineProps<{
 
 const emit = defineEmits(['update:modelValue', 'request-delete', 'request-swap']);
 
-// 🔥 ĐÃ FIX: Chống lỗi v-model readonly
 const questions = computed({
   get() { return props.modelValue || []; },
   set(val) { emit('update:modelValue', val); }
 });
 
-// 🔥 ĐÃ FIX: Ép kiểu cứng sang Number để tránh Vue dính lỗi "chuỗi === số"
 const pNum = computed(() => Number(props.partNumber));
 
 const expandedIds = ref<string[]>([]);
@@ -105,6 +103,7 @@ const showDividerCheck = (index: number) => {
   return true;
 };
 
+// Cân bằng ngữ cảnh khi thêm xóa đổi chỗ 
 const rebalanceContexts = (listToBalance: any[]) => {
   if (!listToBalance || listToBalance.length === 0) return;
   const p = pNum.value;
@@ -112,15 +111,26 @@ const rebalanceContexts = (listToBalance: any[]) => {
 
   if (p === 3 || p === 4) {
     for (let i = 0; i < listToBalance.length; i += 3) {
-      let foundImage = ''; let foundContent = '';
+      let foundImage = ''; 
+      let foundContent = '';
+      let foundTranscript = '';
+      
       for (let j = 0; j < 3; j++) {
         if (listToBalance[i + j]) {
           if (!foundImage && listToBalance[i + j].image) foundImage = listToBalance[i + j].image;
           if (!foundContent && listToBalance[i + j].content) foundContent = listToBalance[i + j].content;
-          listToBalance[i + j].image = ''; listToBalance[i + j].content = '';
+          if (!foundTranscript && listToBalance[i + j].transcript) foundTranscript = listToBalance[i + j].transcript;
+          
+          listToBalance[i + j].image = ''; 
+          listToBalance[i + j].content = '';
+          listToBalance[i + j].transcript = '';
         }
       }
-      if (listToBalance[i]) { listToBalance[i].image = foundImage; listToBalance[i].content = foundContent; }
+      if (listToBalance[i]) { 
+        listToBalance[i].image = foundImage; 
+        listToBalance[i].content = foundContent; 
+        listToBalance[i].transcript = foundTranscript;
+      }
     }
     return;
   }
@@ -229,7 +239,7 @@ const createNewObject = (groupId?: string) => {
   const p = pNum.value;
   const base: any = {
     id: `q_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-    text: '', content: '', explanation: '', image: '',
+    text: '', content: '', transcript: '', explanation: '', image: '',
     options: p === 2 ? ['', '', ''] : ['', '', '', ''],
     correctAnswer: 'A' 
   };
@@ -348,7 +358,6 @@ const toggleQuestion = (id: string) => {
 
 <style scoped>
 .part-page { display: flex; flex-direction: column; gap: 20px; padding-bottom: 40px; }
-/* 🔥 ĐÃ FIX: Chỉnh margin 12px trên và 24px dưới, bù trừ hoàn hảo với 12px của ô thẻ ghi nhớ */
 .group-divider { display: flex; align-items: center; margin: 12px 0 24px 0; }
 .divider-line { flex: 1; border-bottom: 2px dashed #cbd5e1; }
 .btn-add-large { width: 100%; padding: 14px; margin-top: 4px; background: white; border: 2px dashed #bfdbfe; border-radius: 12px; color: #2563eb; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }

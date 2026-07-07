@@ -18,9 +18,7 @@ class MyXBlock(XBlock):
     has_score = True
     icon_class = 'problem'
 
-    # ==========================================
-    # 1. KHAI BÁO CƠ SỞ DỮ LIỆU CỦA EDX
-    # ==========================================
+    # khai báo cơ sở dữ liệu Edx
     exam_data_json = Dict(default={}, scope=Scope.settings, help="Cấu trúc câu hỏi")
     exam_settings_json = Dict(default={}, scope=Scope.settings, help="Cài đặt bài thi")
     builder_mode = String(default="traditional", scope=Scope.settings)
@@ -31,9 +29,8 @@ class MyXBlock(XBlock):
         data = pkg_resources.resource_string(__name__, path)
         return data.decode("utf8")
 
-    # ==========================================
-    # 2. RENDER GIAO DIỆN
-    # ==========================================
+   
+    # giao diện studio / teacher
     def studio_view(self, context=None):
         """ Giao diện Giáo viên (Edit Mode) """
         html = self.resource_string("static/html/studio_view.html")
@@ -50,6 +47,8 @@ class MyXBlock(XBlock):
         })
         return frag
 
+
+    # giao diện student
     def student_view(self, context=None):
         """ Giao diện Học viên (View Mode) """
         html = self.resource_string("static/html/student_view.html")
@@ -57,7 +56,6 @@ class MyXBlock(XBlock):
         frag.add_css(self.resource_string("static/css/toeic_builder_bundle.css"))
         frag.add_javascript(self.resource_string("static/js/toeic_builder_bundle.js"))
         
-        # 🔥 ĐÃ BỔ SUNG: Truyền heartbeat_url sang giao diện học viên
         frag.initialize_js('ToeicAppInit', {
             'mode': 'student',
             'get_url': self.runtime.handler_url(self, 'get_exam_data'),
@@ -67,9 +65,8 @@ class MyXBlock(XBlock):
         })
         return frag
 
-    # ==========================================
-    # 3. API NHẬN/TRẢ DỮ LIỆU VỚI VUE.JS
-    # ==========================================
+    
+    # Edx <---> vue
     @XBlock.json_handler
     def get_exam_data(self, data, suffix=''):
         answers = self.user_progress.get('answers', {}) if 'answers' in self.user_progress else self.user_progress
@@ -111,9 +108,8 @@ class MyXBlock(XBlock):
         
         return {"status": "success", "score": score}
 
-    # ==========================================
-    # 4. API TẢI TỆP TIN XUYÊN SANDBOX
-    # ==========================================
+
+
     @XBlock.handler
     def download_export_file(self, request, suffix=''):
         file_content = request.POST.get('file_content', '')
@@ -129,9 +125,7 @@ class MyXBlock(XBlock):
         
         return response
 
-    # ==========================================
-    # 🔥 5. API CHỐNG ĐĂNG NHẬP ĐỒNG THỜI (HEARTBEAT)
-    # ==========================================
+   
     @XBlock.json_handler
     def check_concurrent_login(self, data, suffix=''):
         client_token = data.get('deviceToken')
@@ -143,7 +137,7 @@ class MyXBlock(XBlock):
 
         current_active_token = self.user_progress.get('active_device_token')
 
-        # Lần đầu mở bài -> Lấy quyền thiết bị
+        # Lần đầu mở bài -> Lấy token thiết bị
         if is_initial_load or not current_active_token:
             self.user_progress['active_device_token'] = client_token
             return {"status": "ok", "action": "allow"}
@@ -152,5 +146,5 @@ class MyXBlock(XBlock):
         if current_active_token != client_token:
             return {"status": "conflict", "action": "kick"}
 
-        # Token khớp -> Cấp phép làm tiếp
+        # Token khớp -> làm tiếp
         return {"status": "ok", "action": "allow"}

@@ -5,29 +5,25 @@ import { useExamStore } from './store/examStore';
 
 window.ToeicAppInit = function (runtime, element, init_data) {
     console.log("==========================================");
-    console.log("🛑 [RADAR] BẮT ĐẦU CHẠY TOEIC_APP_INIT");
-    console.log("==========================================");
-
     const domElement = element.jquery ? element[0] : element;
-    console.log("👉 [1] DOM Element gốc do edX cấp:", domElement);
+    console.log("DOM Element gốc của edX:", domElement);
 
     const wrapper = domElement.querySelector('.toeic-xblock-wrapper');
-    console.log("👉 [2] Thẻ Wrapper tìm thấy:", wrapper);
+    console.log("Thẻ Wrapper tìm thấy:", wrapper);
 
     if (!wrapper) {
-        console.error("❌ LỖI: Không tìm thấy thẻ .toeic-xblock-wrapper trong HTML!");
+        console.error("Không tìm thấy thẻ .toeic-xblock-wrapper");
         return {};
     }
 
     const htmlMode = wrapper.getAttribute('data-mode');
-    console.log("👉 [3] Thẻ 'data-mode' đọc được từ HTML là:", htmlMode);
 
     const config = init_data || {};
-    console.log("👉 [4] Dữ liệu Python (init_data) truyền sang:", config);
+    console.log("dữ liệu python truyền sang:", config);
 
     // Thuật toán ưu tiên: Lấy từ HTML trước, nếu không có mới lấy từ Python
     const finalMode = htmlMode || config.mode || 'student';
-    console.log("👉 [5] CHỐT HẠ CHẾ ĐỘ SẼ CHẠY (finalMode):", finalMode);
+    console.log("final mode:", finalMode);
 
     const pinia = createPinia();
     const app = createApp(App);
@@ -43,10 +39,11 @@ window.ToeicAppInit = function (runtime, element, init_data) {
 
     store.initExam();
     
-    // ĐỔI TỪ #toeic-app-root SANG .toeic-app-mount-point
+    // đổi từ #toeic-app-root SANG .toeic-app-mount-point
     app.mount(wrapper.querySelector('.toeic-app-mount-point'));
 
-    console.log("✅ VUE ĐÃ MOUNT THÀNH CÔNG VÀO CLASS!");
+    console.log("mount thành công");
+    console.log("==========================================");
     return {};
 };
 

@@ -107,11 +107,11 @@ const emit = defineEmits<{
 
 const editorRef = ref<HTMLElement | null>(null);
 
-// Khởi tạo màu mặc định (Đen cho chữ, Vàng chóe cho nền)
+
 const selectedTextColor = ref('#1e293b'); 
 const selectedBgColor = ref('#fef08a'); 
 
-// Hàm thực thi các lệnh định dạng văn bản (In đậm, lề, list...)
+
 const format = (command: string, value: string | undefined = undefined) => {
   document.execCommand(command, false, value);
   editorRef.value?.focus(); // Giữ con trỏ chuột ở lại editor sau khi bấm

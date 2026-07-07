@@ -1,13 +1,15 @@
 <template lang="pug">
 .question-item-student(:id="'question-' + question.id")
-  //- 1. TIÊU ĐỀ CÂU HỎI
   .q-header
     span.q-number {{ question.globalIndex || displayIndex }}.
     span.q-text(v-if="question.text || question.questionText" v-html="question.text || question.questionText")
   
-  //- 2. KHU VỰC TRẢ LỜI
+
   .q-body
-    //- LOẠI 1: TRẮC NGHIỆM
+    .unanswered-notice(v-if="store.isSubmitted && !currentAnswer")
+      span.notice-text Trạng thái: Chưa chọn đáp án
+      
+    // Layout câu hỏi trắc nghiệm
     .options-grid(v-if="!question.type || question.type === 'multiple_choice'")
       label.option-label(
         v-for="(opt, index) in safeOptions" 
@@ -25,7 +27,6 @@
         span.opt-char {{ getOptionChar(index) }}
         span.opt-text(v-if="opt" v-html="opt")
         
-    //- LOẠI 2: ĐIỀN TỪ
     .text-input-wrapper(v-else-if="question.type === 'text_input'")
       input.q-text-input(
         type="text"
@@ -39,9 +40,8 @@
         span Đáp án đúng: 
         b {{ question.correctAnswer }}
 
-    //- LOẠI 3: NỐI TỪ
     .matching-wrapper(v-else-if="question.type === 'matching'")
-      p.text-muted(v-if="!store.isSubmitted") Chọn câu trả lời tương ứng ở hộp thả xuống.
+      p.text-muted(v-if="!store.isSubmitted") Chọn câu trả lời tương ứng.
       .match-row(v-for="(pair, idx) in question.pairs" :key="idx")
         .match-left(v-html="pair.left")
         .match-right
@@ -54,9 +54,8 @@
             option(value="") -- Chọn --
             option(v-for="opt in shuffledMatchingRights" :key="opt" :value="opt") {{ opt }}
 
-  //- 3. GIẢI THÍCH
   .q-explanation(v-if="store.isSubmitted && isShowAnswer && question.explanation")
-    .exp-title 💡 Giải thích chi tiết:
+    .exp-title Giải thích chi tiết:
     .exp-content(v-html="question.explanation")
 </template>
 
@@ -158,7 +157,6 @@ const getMatchingClass = (leftKey: string, correctRight: string) => {
 </script>
 
 <style scoped>
-/* 🔥 ĐÃ FIX: TRẢ LẠI BORDER VÀ CARD CHO TỪNG CÂU HỎI */
 .question-item-student { 
   background: #ffffff; 
   padding: 24px; 
@@ -174,6 +172,21 @@ const getMatchingClass = (leftKey: string, correctRight: string) => {
 .q-number { font-weight: 800; white-space: nowrap; font-size: 1.1rem;}
 .q-text { font-weight: 500; word-wrap: break-word;}
 :deep(.q-text p) { margin: 0; display: inline; }
+
+.unanswered-notice {
+  margin-bottom: 14px;
+  padding-left: 12px;
+}
+.notice-text {
+  display: inline-block;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
 
 .options-grid { display: flex; flex-direction: column; gap: 10px; padding-left: 12px;}
 .option-label { display: flex; align-items: flex-start; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s; background: #f8fafc; }

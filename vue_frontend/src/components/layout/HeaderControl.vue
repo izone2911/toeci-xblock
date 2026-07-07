@@ -16,7 +16,7 @@ header.global-topbar
         type="button"
         @click.prevent="$emit('toggle-fullscreen')" 
         :title="isFullscreen ? 'Thu nhỏ cửa sổ' : 'Phóng to tối đa'"
-      ) {{ isFullscreen ? '🗗 Thu nhỏ' : '🖵 Toàn màn hình nè' }}
+      ) {{ isFullscreen ? '🗗 Thu nhỏ' : '🖵 Toàn màn hình' }}
 
       button.btn-action.btn-save(
         type="button" 
@@ -48,7 +48,7 @@ const emit = defineEmits([
   'save-data'
 ]);
 
-// Đồng bộ text của nút Save theo trạng thái mạng từ Store
+
 const saveButtonText = computed(() => {
   switch (store.saveStatus) {
     case 'saving': return 'Đang lưu...';
@@ -58,7 +58,6 @@ const saveButtonText = computed(() => {
   }
 });
 
-// Đồng bộ class CSS của nút Save để đổi màu sắc tương ứng
 const saveButtonClass = computed(() => {
   return {
     'is-saving': store.saveStatus === 'saving',

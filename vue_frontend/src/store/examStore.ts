@@ -13,8 +13,7 @@ const getEdxHeaders = () => ({
 
 export interface ExamProgress {
   answers: Record<string, any>;
-  audioCurrentTime: number;
-  audioProgressMap?: Record<string, number>; 
+  audioProgressMap: Record<string, number>; 
   isSubmitted: boolean;
   hasStarted: boolean;
   endTime: number | null;
@@ -30,7 +29,7 @@ export const useExamStore = defineStore('exam', {
       saveUrl: '',
       submitUrl: '',
       downloadUrl: '',
-      heartbeatUrl: '' // 🔥 BỔ SUNG: URL nhận diện từ Python
+      heartbeatUrl: '' 
     },
 
     config: {
@@ -54,11 +53,11 @@ export const useExamStore = defineStore('exam', {
     
     saveStatus: 'idle' as 'idle' | 'saving' | 'success' | 'error',
     _debounceTimer: null as ReturnType<typeof setTimeout> | null,
+    _audioSyncTimer: null as ReturnType<typeof setTimeout> | null, // 🔥 BỔ SUNG: Timer cho Audio
     _isSubscribed: false,
     
-    audioUrl: '' as string,
-    audioCurrentTime: 0 as number,
     audioProgressMap: {} as Record<string, number>, 
+    
     parts: [] as any[],
     activePartIndex: 0,
     activeQuestionId: '' as string,
@@ -77,7 +76,6 @@ export const useExamStore = defineStore('exam', {
     
     scoreResult: null as any,
 
-    // 🔥 BỔ SUNG CƠ CHẾ KICK ĐA THIẾT BỊ
     deviceToken: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
     heartbeatInterval: null as ReturnType<typeof setInterval> | null,
     isKickedOut: false
@@ -136,13 +134,13 @@ export const useExamStore = defineStore('exam', {
             headers: getEdxHeaders(),
             body: JSON.stringify(payload)
           });
-          if (!res.ok) throw new Error("Edx từ chối kết nối");
+          if (!res.ok) throw new Error("Máy chủ từ chối tiếp nhận yêu cầu");
         } catch (error) {
-          console.error("Lỗi đồng bộ cấu hình lên edX:", error);
+          console.error("Lỗi đồng bộ cấu hình lên máy chủ edX:", error);
           throw error;
         }
       } else {
-        console.info("Local Dev: Cấu hình đề thi đã được lưu giả lập.", payload);
+        console.info("Môi trường phát triển nội bộ: Tiến trình đã được lưu cục bộ.", payload);
       }
     },
 
@@ -151,15 +149,15 @@ export const useExamStore = defineStore('exam', {
         clearInterval(this.timerInterval);
         this.timerInterval = null;
       }
+      
       this.hasStarted = false;
       this.isRunning = false;
       this.isSubmitted = false;
       this.userAnswers = {};
-      this.audioCurrentTime = 0;
       this.audioProgressMap = {};
       this.scoreResult = null;
       this.endTime = null;
-      this.isKickedOut = false; // Reset cờ Kicked khi khởi tạo lại đề thi
+      this.isKickedOut = false; 
 
       this.isLoading = true;
       this.config.examId = examId;
@@ -175,7 +173,7 @@ export const useExamStore = defineStore('exam', {
           });
           
           if (!res.ok) {
-            console.warn("API edX trả về lỗi. Khởi tạo dữ liệu rỗng.");
+            console.warn("Máy chủ chưa có dữ liệu. Sử dụng cấu trúc hệ thống rỗng.");
             rawData = {}; 
           } else {
             rawData = await res.json();
@@ -190,7 +188,7 @@ export const useExamStore = defineStore('exam', {
           }
         } else {
           const res = await fetch('/exam_data.json');
-          if (!res.ok) throw new Error("Yêu cầu file exam_data.json trong thư mục public/");
+          if (!res.ok) throw new Error("Yêu cầu dữ liệu hệ thống cục bộ thất bại.");
           rawData = await res.json();
         }
 
@@ -206,7 +204,7 @@ export const useExamStore = defineStore('exam', {
               localStorage.removeItem(draftKey);
             }
           } catch (e) {
-            console.error("Lỗi parse dữ liệu nháp:", e);
+            console.error("Lỗi giải mã cấu trúc dữ liệu nháp cục bộ:", e);
           }
         }
 
@@ -221,7 +219,6 @@ export const useExamStore = defineStore('exam', {
 
         this.builderMode = rawData.builderMode || 'traditional';
         this.examDataRaw = this.sanitizeExamData(rawData.examData); 
-        this.audioUrl = this.examSettings.globalListeningAudio || '';
 
         const examDataMap = this.examDataRaw;
 
@@ -229,6 +226,8 @@ export const useExamStore = defineStore('exam', {
           this.parts = examDataMap.custom.map((p: any) => ({
             id: p.id,
             title: p.name,
+            mediaUrl: p.mediaUrl || '',
+            sharedContext: p.sharedContext || '',
             questions: p.questions || []
           }));
         } else {
@@ -246,13 +245,8 @@ export const useExamStore = defineStore('exam', {
         const progress = rawData.progress as ExamProgress | null;
         if (progress) {
           this.userAnswers = progress.answers || {};
-          this.audioCurrentTime = progress.audioCurrentTime || 0;
           this.audioProgressMap = progress.audioProgressMap || {};
           
-          if (this.audioCurrentTime > 0 && Object.keys(this.audioProgressMap).length === 0) {
-            this.audioProgressMap['global'] = this.audioCurrentTime;
-          }
-
           this.isSubmitted = progress.isSubmitted || false;
           this.hasStarted = progress.hasStarted || false;
           this.endTime = progress.endTime || null;
@@ -283,13 +277,12 @@ export const useExamStore = defineStore('exam', {
           this.startTimer();
         }
 
-        // 🔥 BẮT ĐẦU VÒNG LẶP KIỂM SOÁT ĐĂNG NHẬP
         if (this.edxConfig.mode === 'student' && !this.isSubmitted) {
           this.startHeartbeat();
         }
 
       } catch (error) {
-        console.error("Lỗi hệ thống khi tải cấu trúc đề thi:", error);
+        console.error("Lỗi khi tải cấu hình đề thi:", error);
       } finally {
         this.isLoading = false;
       }
@@ -320,21 +313,21 @@ export const useExamStore = defineStore('exam', {
       this.syncProgressToBackend();
     },
 
+    // 🔥 ĐÃ FIX: Áp dụng cơ chế Debounce tự lưu ngầm mượt mà, không phụ thuộc đồng hồ
     saveAudioProgress(url: string, time: number) {
-      if (this.isSubmitted || !this.hasStarted) return;
-      const cleanUrl = url || 'global';
-      const lastRecordedTime = this.audioProgressMap[cleanUrl] || 0;
+      if (this.isSubmitted) return;
+      const cleanUrl = url || 'global_media';
       
       this.audioProgressMap[cleanUrl] = time;
-      this.audioCurrentTime = time;
 
-      if (Math.floor(time) !== Math.floor(lastRecordedTime) && Math.floor(time) % 2 === 0) {
+      if (this._audioSyncTimer) clearTimeout(this._audioSyncTimer);
+      this._audioSyncTimer = setTimeout(() => {
         this.syncProgressToBackend();
-      }
+      }, 1500); // Tự động lưu tiến trình mỗi 1.5 giây
     },
 
     getAudioProgress(url: string): number {
-      const cleanUrl = url || 'global';
+      const cleanUrl = url || 'global_media';
       return this.audioProgressMap[cleanUrl] || 0;
     },
 
@@ -345,7 +338,6 @@ export const useExamStore = defineStore('exam', {
         timeRemaining: this.timeRemaining,
         endTime: this.endTime,
         hasStarted: this.hasStarted,
-        audioCurrentTime: this.audioCurrentTime,
         audioProgressMap: this.audioProgressMap,
         scoreResult: this.scoreResult
       };
@@ -463,21 +455,16 @@ export const useExamStore = defineStore('exam', {
             })
           });
         } catch (error) {
-          console.error("Lỗi giao tiếp kết nối điểm lên hệ thống edX:", error);
+          console.error("Lỗi kết xuất điểm lên hệ thống:", error);
         }
       } else {
-        console.info(`Local Dev: Đã nộp bài giả lập. Điểm thi đạt: ${totalScore}/${totalCount}`);
+        console.info(`Đã nộp bài giả lập. Điểm: ${totalScore}/${totalCount}`);
       }
     },
 
-    // ==========================================
-    // 🔥 HÀM MỚI: QUẢN LÝ NHỊP TIM ĐỘC QUYỀN
-    // ==========================================
     async startHeartbeat() {
-      // 1. Gửi token cướp quyền lúc vừa mở web
       await this.pingDeviceToken(true);
       
-      // 2. Cứ 15 giây ping 1 lần để kiểm tra xem có bị chiếm quyền không
       if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = setInterval(() => {
         this.pingDeviceToken(false);
@@ -499,7 +486,6 @@ export const useExamStore = defineStore('exam', {
         
         if (res.ok) {
           const result = await res.json();
-          // Nếu Python báo KICK, lập tức khóa trạng thái
           if (result.action === 'kick') {
             this.isKickedOut = true;
             if (this.heartbeatInterval) {
@@ -509,7 +495,7 @@ export const useExamStore = defineStore('exam', {
           }
         }
       } catch (error) {
-        console.warn("Lỗi kiểm tra nhịp tim", error);
+        console.warn("Lỗi kiểm tra nhịp tim thiết bị", error);
       }
     }
   }

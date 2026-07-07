@@ -1,10 +1,5 @@
-// vue_frontend/src/utils/data_parser.ts
+// Chuẩn hóa dữ liệu question
 
-/**
- * ============================================================================
- * 1. BỘ CHUẨN HÓA DỮ LIỆU CÂU HỎI (QUESTION NORMALIZER)
- * ============================================================================
- */
 const normalizeQuestionObject = (q: any, partNumber: number | string) => {
   let finalId = String(q.id || '');
   if (!finalId || !finalId.startsWith('q_')) {
@@ -16,6 +11,7 @@ const normalizeQuestionObject = (q: any, partNumber: number | string) => {
     type: q.type || 'multiple_choice',
     text: q.text || '',
     content: q.content || '',
+    transcript: q.transcript || '', 
     explanation: q.explanation || '',
     image: q.image || '',
     correctAnswer: q.correctAnswer || '',
@@ -55,11 +51,7 @@ const normalizeQuestionObject = (q: any, partNumber: number | string) => {
   return base;
 };
 
-/**
- * ============================================================================
- * 2. CHUYỂN ĐỔI KIẾN TRÚC MẢNG LỒNG NHAU (QUESTION_GROUP -> CHILDREN)
- * ============================================================================
- */
+// question group -> children
 const buildNestedGroups = (flatArray: any[]) => {
   const groups: any[] = [];
   let currentGroup: any = null;
@@ -71,6 +63,7 @@ const buildNestedGroups = (flatArray: any[]) => {
         type: 'QuestionGroup', 
         image: q.image || '',
         content: q.content || '',
+        transcript: q.transcript || '', // Bổ sung transcript vào Group
         sharedContext: q.sharedContext || '',
         passages: q.passages && q.passages.length ? q.passages : [],
         transcripts: q.transcripts && q.transcripts.length ? q.transcripts : [],
@@ -80,6 +73,8 @@ const buildNestedGroups = (flatArray: any[]) => {
     }
     const childQ = { ...q };
     delete childQ.passages; delete childQ.transcripts; delete childQ.sharedContext;
+    // Xóa transcript khỏi children nếu nằm ở Part 1-6
+    if (q.groupId) delete childQ.transcript;
     currentGroup.children.push(childQ);
   });
   return groups;
@@ -93,6 +88,7 @@ const flattenGroups = (nestedArray: any[], p: number | string) => {
         q.groupId = group.groupId;
         if (group.image) q.image = group.image;
         if (group.content) q.content = group.content;
+        if (group.transcript) q.transcript = group.transcript;
         if (group.sharedContext) q.sharedContext = group.sharedContext;
         if (group.passages) q.passages = group.passages;
         if (group.transcripts) q.transcripts = group.transcripts;
@@ -172,11 +168,8 @@ export const parseImportJSON = (jsonString: string): { success: boolean; data?: 
   }
 };
 
-/**
- * ============================================================================
- * 3. XUẤT NHẬP ĐỊNH DẠNG GIFT MỞ RỘNG (EXTENDED GIFT)
- * ============================================================================
- */
+
+
 export const generateExportGIFT = (examData: any, examSettings: any, builderMode: string): string => {
   let giftText = `// ====== SETTINGS ======\n// @Mode: ${builderMode}\n// @TimeLimitEnabled: ${examSettings.isTimeLimitEnabled}\n// @TimeLimit: ${examSettings.timeLimitSeconds}\n// @ShowAnswer: ${examSettings.isShowAnswerEnabled}\n// @AudioSeek: ${examSettings.isAudioSeekEnabled}\n`;
   if (examSettings.globalListeningAudio) { giftText += `// @GlobalAudio: ${examSettings.globalListeningAudio}\n`; }
@@ -200,20 +193,21 @@ export const generateExportGIFT = (examData: any, examSettings: any, builderMode
             if ([3, 4, 6, 7].includes(p)) giftText += `::Passage-Start::\n`;
           }
 
-          const title = `::Part ${p} - Câu ${globalIdx++}::\n`;
+          const title = `::Câu ${globalIdx++}::\n`;
           let contextText = '';
           
           if (p === 1 || p === 2) { 
             if (q.image) contextText += `[img: ${q.image}]\n`; 
+            if (q.transcript) contextText += `[transcript: ${q.transcript}]\n`; 
           } else if (p === 3 || p === 4) { 
             if (isLeader) { 
               if (q.image) contextText += `[img: ${q.image}]\n`; 
-              if (q.content) contextText += `[transcript: ${q.content}]\n`; 
+              if (q.transcript) contextText += `[transcript: ${q.transcript}]\n`; 
             } 
           } else if (p === 6) { 
             if (isLeader) { 
               if (q.content) contextText += `[text: ${q.content}]\n`; 
-              if (q.image) contextText += `[transcript: ${q.image}]\n`; 
+              if (q.transcript) contextText += `[transcript: ${q.transcript}]\n`; 
             } 
           } else if (p === 7) {
             if (isLeader) {
@@ -271,7 +265,6 @@ export const generateExportGIFT = (examData: any, examSettings: any, builderMode
         if (isLeader) {
           if (q.sharedContext) contextText += `[context: ${q.sharedContext}]\n`;
           if (q.passages) { q.passages.forEach((pass: any) => { if (pass.type === 'text') contextText += `[text: ${pass.content}]\n`; if (pass.type === 'image') contextText += `[img: ${pass.url}]\n`; }); }
-          // 🔥 ĐÃ FIX: Hỗ trợ xuất Transcript của Custom Mode ra file GIFT
           if (q.transcripts) { q.transcripts.forEach((tr: any) => { if (tr.type === 'text') contextText += `[transcript: ${tr.content}]\n`; if (tr.type === 'image') contextText += `[img: ${tr.url}]\n`; }); }
         }
 
@@ -347,7 +340,7 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
         if (!blockWithoutTitle) return;
 
         const passages: any[] = []; const transcripts: any[] = []; 
-        let imagePart1234 = ''; let contentPart346 = '';
+        let imagePart1234 = ''; let contentPart346 = ''; let transcriptPart12346 = '';
 
         const tagRegex = /\[(img|text|transcript|audio|context|exp):\s*([\s\S]*?)\]/g; let match;
         while ((match = tagRegex.exec(blockWithoutTitle)) !== null) {
@@ -359,7 +352,7 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
           } else {
             if (tag === 'img') imagePart1234 = val; 
             if (tag === 'text') contentPart346 = val;
-            if (tag === 'transcript') { if (p === 6) imagePart1234 = val; else contentPart346 = val; }
+            if (tag === 'transcript') transcriptPart12346 = val; 
           }
         }
 
@@ -390,11 +383,32 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
           groupId: currentGroupId 
         };
 
-        if (p === 1 || p === 2) { qObj.text = qText; if (imagePart1234) qObj.image = imagePart1234; } 
-        else if (p === 3 || p === 4) { qObj.text = qText; if (imagePart1234) qObj.image = imagePart1234; if (contentPart346) qObj.content = contentPart346; } 
-        else if (p === 5) { qObj.content = qText; qObj.explanation = exp; } 
-        else if (p === 6) { qObj.text = exp; if (contentPart346) qObj.content = contentPart346; if (imagePart1234) qObj.image = imagePart1234; } 
-        else if (p === 7) { qObj.text = qText; qObj.explanation = exp; if (passages.length > 0) qObj.passages = passages; if (transcripts.length > 0) qObj.transcripts = transcripts; }
+        if (p === 1 || p === 2) { 
+          qObj.text = qText; 
+          if (imagePart1234) qObj.image = imagePart1234; 
+          if (transcriptPart12346) qObj.transcript = transcriptPart12346;
+        } 
+        else if (p === 3 || p === 4) { 
+          qObj.text = qText; 
+          if (imagePart1234) qObj.image = imagePart1234; 
+          if (contentPart346) qObj.content = contentPart346; 
+          if (transcriptPart12346) qObj.transcript = transcriptPart12346;
+        } 
+        else if (p === 5) { 
+          qObj.content = qText; 
+          qObj.explanation = exp; 
+        } 
+        else if (p === 6) { 
+          qObj.text = exp; 
+          if (contentPart346) qObj.content = contentPart346; 
+          if (transcriptPart12346) qObj.transcript = transcriptPart12346; 
+        } 
+        else if (p === 7) { 
+          qObj.text = qText; 
+          qObj.explanation = exp; 
+          if (passages.length > 0) qObj.passages = passages; 
+          if (transcripts.length > 0) qObj.transcripts = transcripts; 
+        }
         
         freshData[p].push(normalizeQuestionObject(qObj, p));
       });
@@ -439,13 +453,12 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
         let textPlaceholder = ''; const placeMatch = block.match(/\/\/\s*@Placeholder:\s*(.*)/); if (placeMatch) textPlaceholder = placeMatch[1].trim();
 
         const passages: any[] = [];
-        const transcripts: any[] = []; // 🔥 ĐÃ BỔ SUNG: Mảng hứng transcript cho Custom Mode
+        const transcripts: any[] = []; 
 
         const tagRegex = /\[(img|text|transcript|audio|context|exp):\s*([\s\S]*?)\]/g; let match;
         while ((match = tagRegex.exec(block)) !== null) {
           if (match[1] === 'text') passages.push({ type: 'text', content: match[2].trim() });
           if (match[1] === 'img') passages.push({ type: 'image', url: match[2].trim() });
-          // 🔥 ĐÃ BỔ SUNG: Parse Transcript từ text thuần
           if (match[1] === 'transcript') transcripts.push({ type: 'text', content: match[2].trim() });
         }
 
@@ -483,6 +496,7 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
           type: qType, 
           text: qText, 
           content: '', 
+          transcript: '',
           sharedContext, 
           options, 
           pairs, 
@@ -492,7 +506,7 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
           score, 
           textPlaceholder, 
           passages,
-          transcripts // 🔥 ĐÃ BỔ SUNG: Truyền transcript vào object
+          transcripts 
         };
         currentPart.questions.push(normalizeQuestionObject(rawCustomQ, 'custom'));
       });
@@ -505,7 +519,8 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
         if (Array.isArray(partList)) {
           partList.forEach((q: any) => {
             if (q.groupId === lastGId) {
-              if (key === '7') { q.passages = []; q.transcripts = []; } else { q.image = ''; q.content = ''; }
+              if (key === '7') { q.passages = []; q.transcripts = []; } 
+              else { q.image = ''; q.content = ''; q.transcript = ''; } 
             } else {
               lastGId = q.groupId;
             }
@@ -517,7 +532,6 @@ export const parseImportGIFT = (content: string): { success: boolean; data?: any
             let lastGId = '';
             if (Array.isArray(part.questions)) {
               part.questions.forEach((q: any) => {
-                // 🔥 ĐÃ FIX: Reset cả mảng transcripts ở các câu hỏi nối đuôi nhau trong Custom Mode
                 if (q.groupId === lastGId) { q.passages = []; q.transcripts = []; q.sharedContext = ''; } else { lastGId = q.groupId; }
               });
             }

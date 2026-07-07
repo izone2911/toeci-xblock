@@ -1,8 +1,6 @@
 <template lang="pug">
 .question-board-student
-  //- ==========================================
-  //- 1. KHU VỰC GIỚI THIỆU CHUNG TOÀN PART (CUSTOM MODE)
-  //- ==========================================
+
   .part-intro-box(v-if="partData?.sharedContext || partData?.mediaUrl")
     .part-context-global(v-if="partData.sharedContext" v-html="partData.sharedContext")
     
@@ -17,7 +15,7 @@
           @timeupdate="handleLocalTimeUpdate"
           @loadedmetadata="restoreLocalAudioProgress"
         )
-        //- Giao diện Custom đồng bộ đối xứng cân đối
+        // Giao diện Audio
         .custom-player-engine
           button.btn-audio-control(@click="toggleLocalPlay" type="button")
             span(v-if="isLocalPlaying") ⏸️
@@ -32,11 +30,10 @@
             .audio-timeline-bullet(v-if="store.examSettings?.isAudioSeekEnabled" :style="{ left: localProgressPercent + '%' }")
             
           span.audio-time-txt {{ formatAudioTime(localDuration) }}
-      a.video-btn(:href="partData.mediaUrl" target="_blank" v-else) 🎥 Xem Video Đính Kèm
+      a.video-btn(:href="partData.mediaUrl" target="_blank" v-else) Xem 
 
-  //- ==========================================
-  //- AUDIO GLOBAL TRUYỀN THỐNG (FALLBACK ĐƯỜNG DẪN URL CHUNG)
-  //- ==========================================
+
+  // audio global traditional
   .global-media-box(v-if="!partData?.mediaUrl && partData?.audioUrl")
     .highlight-audio-container
       audio(
@@ -63,12 +60,11 @@
           
         span.audio-time-txt {{ formatAudioTime(localDuration) }}
 
-  //- ==========================================
-  //- 2. VÒNG LẶP RENDER CÁC NHÓM CÂU HỎI THEO CỤM NGỮ CẢNH
-  //- ==========================================
+
+    //render câu hỏi
   template(v-for="(group, gIdx) in groupedQuestions" :key="group.groupId || gIdx")
     
-    //- LAYOUT 1: SPLIT-PANE (DÀNH CHO KHỐI CHỨA ĐOẠN VĂN PASSAGES DÀI)
+    // layout 1
     .question-group.split-group(v-if="group.passages && group.passages.length > 0")
       .split-layout
         .left-pane
@@ -76,8 +72,9 @@
             p.text-content(v-if="pass.type === 'text'" v-html="pass.content")
             img.image-content(v-else-if="pass.type === 'image'" :src="pass.url")
             
-          .transcript-zone(v-if="store.isSubmitted && store.examSettings?.isShowAnswerEnabled && group.transcripts && group.transcripts.length > 0")
-            .transcript-header Dịch nghĩa / Chú thích chung:
+          // Chỉ hiển thị nội dung giải nghĩa khi bài đã nộp và được cấp quyền xem đáp án
+          .transcript-zone(v-if="store.isSubmitted === true && store.examSettings?.isShowAnswerEnabled === true && group.transcripts && group.transcripts.length > 0")
+            .transcript-header Transcript / Giải thích:
             .passage-content(v-for="(tr, trIdx) in group.transcripts" :key="'tr_'+trIdx")
               p.text-content(v-if="tr.type === 'text'" v-html="tr.content")
               img.image-content(v-else-if="tr.type === 'image'" :src="tr.url")
@@ -90,7 +87,7 @@
             :displayIndex="getQuestionIndex(gIdx, index)"
           )
 
-    //- LAYOUT 2: VERTICAL (DÀNH CHO CÁC CÂU HỎI ĐƠN LẺ HOẶC KHÔNG CHỨA PASSAGE)
+    // layout 2
     .question-group.vertical-layout(
       v-else 
       :class="{ 'is-standalone-single': isStandaloneSingle(group) }"
@@ -124,7 +121,6 @@ const store = useExamStore();
 
 const isAudio = (url: string) => /\.(mp3|wav|ogg|m4a)$/i.test(url);
 
-// Trạng thái Engine Audio Custom cho Component con
 const isLocalPlaying = ref(false);
 const localCurrentTime = ref(0);
 const localDuration = ref(0);
@@ -181,9 +177,8 @@ const handleLocalTimelineClick = (e: MouseEvent) => {
   localAudioRef.value.currentTime = clickPercent * localDuration.value;
 };
 
-// ==========================================
-// THUẬT TOÁN GỘP NHÓM ĐOẠN VĂN TRƯỚC ĐÓ
-// ==========================================
+
+
 const groupedQuestions = computed(() => {
   const groups: any[] = [];
   let currentGroup: any = null;
@@ -221,8 +216,12 @@ const groupedQuestions = computed(() => {
     }
 
     if (shouldCreateNewGroup) {
-      const initialTranscripts = q.transcripts || [];
-      if (q.transcript) initialTranscripts.push({ type: 'text', content: q.transcript });
+      // Đảm bảo không render nội dung transcripts khi câu hỏi chưa được nộp
+      let initialTranscripts: any[] = [];
+      if (store.isSubmitted) {
+         initialTranscripts = q.transcripts || [];
+         if (q.transcript) initialTranscripts.push({ type: 'text', content: q.transcript });
+      }
 
       currentGroup = {
         groupId: q.groupId || `temp_${Math.random()}`,
@@ -238,7 +237,11 @@ const groupedQuestions = computed(() => {
       currentGroup.children.push(q);
       if (!currentGroup.image && (q.image || q.imageUrl)) currentGroup.image = q.image || q.imageUrl;
       if (!currentGroup.content && (q.content?.trim() && !q.questionText)) currentGroup.content = q.content;
-      if (q.transcript) currentGroup.transcripts.push({ type: 'text', content: q.transcript });
+      
+      // Đảm bảo không render nội dung transcripts khi câu hỏi chưa được nộp
+      if (store.isSubmitted && q.transcript) {
+          currentGroup.transcripts.push({ type: 'text', content: q.transcript });
+      }
     }
   });
   

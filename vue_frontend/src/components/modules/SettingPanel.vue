@@ -20,9 +20,8 @@
       input(type="checkbox" v-model="settings.isShowAnswerEnabled")
       span.slider
 
-  //- ĐÃ BỔ SUNG: Nút gạt cấu hình tua Audio
   .setting-row.mt-2
-    span.setting-label Tua Audio (Nghe)
+    span.setting-label Tua Audio
     label.toggle-switch(title="Cho phép học viên tua/chuyển tiếp Audio bài nghe")
       input(type="checkbox" v-model="settings.isAudioSeekEnabled")
       span.slider
@@ -36,7 +35,7 @@ const props = defineProps<{
     globalListeningAudio: string;
     isTimeLimitEnabled: boolean;
     isShowAnswerEnabled: boolean;
-    isAudioSeekEnabled: boolean; // Bổ sung biến trạng thái Tua Audio
+    isAudioSeekEnabled: boolean;
     timeLimitSeconds: number;
   }
 }>();

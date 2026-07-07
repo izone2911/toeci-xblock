@@ -9,12 +9,12 @@
   @drop.prevent="$emit('drop-item', $event)"
   @dragend="$emit('dragend-item')"
 )
-  //- THANH HEADER TỐI GIẢN
+
   .accordion-header(
     @click="$emit('toggle')"
     @mouseenter="$emit('mouseenter')"
     @mouseleave="$emit('mouseleave')"
-    title="Bấm để mở rộng/thu gọn, kéo thả để hoán đổi vị trí"
+    title="Nhấn để thu/phóng, kéo thả biểu tượng để di chuyển"
   )
     .header-left
       span.drag-handle ⣿
@@ -32,68 +32,68 @@
       
       .header-text-badge(v-else-if="question.type === 'text_input'")
         span.text-badge-correct Điền từ
-        span.text-badge-key(v-if="question.correctAnswer" style="margin-left: 6px; background: #f1f5f9; color: #475569; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;") Key: {{ question.correctAnswer }}
+        span.text-badge-key(v-if="question.correctAnswer" style="margin-left: 6px; background: #f1f5f9; color: #475569; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;") Chìa khóa: {{ question.correctAnswer }}
     
-    //- NÚT THAO TÁC
-    .header-actions
-      button.btn-add-mini(v-if="[1,2,3,4,5,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-above')" title="Chèn 1 câu lên trên") + Trên
-      button.btn-add-mini(v-if="[1,2,3,4,5,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-below')" title="Chèn 1 câu xuống dưới") + Dưới
-      button.btn-add-mini.new-group-btn(v-if="[3,4,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-group-below')" title="Tạo 1 ĐOẠN MỚI phía dưới") + Đoạn
-      button.btn-del-question(type="button" @click.stop="$emit('delete')" title="Xóa câu này") Xóa
 
-  //- NỘI DUNG CHỈNH SỬA
+    .header-actions
+      button.btn-add-mini(v-if="[1,2,3,4,5,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-above')" title="Chèn một câu lên trên") + Trên
+      button.btn-add-mini(v-if="[1,2,3,4,5,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-below')" title="Chèn một câu xuống dưới") + Dưới
+      button.btn-add-mini.new-group-btn(v-if="[3,4,6,7,'custom'].includes(partNumber)" type="button" @click.stop="$emit('insert-group-below')" title="Tạo một nhóm/đoạn mới") + Đoạn mới
+      button.btn-del-question(type="button" @click.stop="$emit('delete')" title="Xóa câu hỏi này") Xóa
+
+
   .accordion-body(v-show="isExpanded")
     
     template(v-if="partNumber === 1 || partNumber === 2")
       .top-row-grid
         template(v-if="partNumber === 1")
           .editor-card.media-card
-            h4 Hình ảnh
+            h4 Hình ảnh đính kèm
             .media-section.single-media
               .preview-container(v-if="question.image")
                 img.preview-img(:src="question.image")
                 button.btn-remove-media(type="button" @click="question.image = ''") ×
               .upload-box.image-box(v-else)
-                input.media-input(v-model="question.image" placeholder="URL ảnh minh họa cho Part 1...")
+                input.media-input(v-model="question.image" placeholder="URL hình ảnh...")
         
         template(v-if="partNumber === 2")
           .editor-card.transcript-card
-            h4 Transcript / Lời thoại (Chỉ hiện khi sinh viên xem đáp án)
-            RichTextEditor(v-model="question.content" placeholder="Nhập lời thoại của người hỏi và các phương án trả lời...")
+            h4 Lời thoại / Transcript 
+            RichTextEditor(v-model="question.transcript" placeholder="Transcript")
 
         .editor-card.options-card
-          h4 Đáp án
+          h4 Cấu hình đáp án
           .options-grid
             .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
               button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
               textarea.option-textarea(v-model="question.options[oIdx]" rows="1" @input="autoResize")
 
       .editor-card.transcript-card.mt-4(v-if="partNumber === 1")
-        h4 Transcript
-        RichTextEditor(v-model="question.content" placeholder="Nhập transcript của 4 đáp án A, B, C, D...")
+        h4 Lời thoại / Transcript
+        RichTextEditor(v-model="question.transcript" placeholder="Trình bày lời thoại miêu tả các đáp án A, B, C, D...")
 
     template(v-if="partNumber === 3 || partNumber === 4")
       .shared-context-box(v-if="isFirstInGroup")
-        h3.shared-title {{ partNumber === 3 ? 'Đoạn hội thoại' : 'Bài nói ngắn' }}
+        h3.shared-title {{ partNumber === 3 ? 'Đoạn thoại' : 'Đoạn thoại' }}
         .top-row-grid
           .editor-card.media-card
-            h4 Hình ảnh
+            h4 Hình ảnh đính kèm
             .media-section.single-media
               .preview-container(v-if="question.image")
                 img.preview-img(:src="question.image")
                 button.btn-remove-media(type="button" @click="question.image = ''") ×
               .upload-box.image-box(v-else)
-                input.media-input(v-model="question.image" placeholder="URL ảnh")
+                input.media-input(v-model="question.image" placeholder="URL hình ảnh...")
           .editor-card.transcript-card
-            h4 Transcript
-            RichTextEditor(v-model="question.content" placeholder="Nhập transcript vào đây...")
+            h4 Lời thoại / Transcript chung (Bảo mật)
+            RichTextEditor(v-model="question.transcript" placeholder="Transcript")
       .question-content-box
         .editor-card.q-text-card
-          h4 Câu hỏi
+          h4 Văn bản câu hỏi
           div
             RichTextEditor(v-model="question.text" placeholder="Nhập nội dung câu hỏi...")
         .editor-card.options-card.mt-4
-          h4 Đáp án
+          h4 Cấu hình đáp án
           .options-grid
             .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
               button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
@@ -104,14 +104,14 @@
         .shared-context-box.mb-4
           .top-row-grid
             .editor-card.q-content-card
-              h4 Câu hỏi
+              h4 Văn bản câu hỏi
               div
                 RichTextEditor(v-model="question.content" placeholder="Ví dụ: Mr. Smith is currently ________ a meeting in Tokyo.")
             .editor-card.explanation-card
-              h4 Giải thích
-              RichTextEditor(v-model="question.explanation" placeholder="Nhập giải thích chi tiết...")
+              h4 Giải thích chi tiết đáp án
+              RichTextEditor(v-model="question.explanation" placeholder="Giải thích từ khóa là lựa chọn chính xác...")
         .editor-card.options-card.mt-4
-          h4 Đáp án
+          h4 Cấu hình đáp án
           .options-grid
             .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
               button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
@@ -119,21 +119,21 @@
 
     template(v-if="partNumber === 6")
       .shared-context-box(v-if="isFirstInGroup")
-        h3.shared-title Đoạn văn
+        h3.shared-title Bối cảnh đoạn văn
         .top-row-grid
           .editor-card.passage-card
-            h4 Nội dung đoạn văn
+            h4 Nội dung đoạn văn bản
             div
-              RichTextEditor(v-model="question.content" placeholder="Nhập nội dung đoạn văn chứa các khoảng trống cần điền vào đây...")
+              RichTextEditor(v-model="question.content" placeholder="Trình bày chi tiết đoạn văn bản có chứa các khoảng trống cần điền...")
           .editor-card.explanation-card
-            h4 Giải thích / Dịch nghĩa
-            RichTextEditor(v-model="question.image" placeholder="Dịch nghĩa toàn bộ đoạn văn hoặc thêm chú thích chung...")
+            h4 Giải nghĩa chung / Lời thoại (Bảo mật)
+            RichTextEditor(v-model="question.transcript" placeholder="Transcript")
       .question-content-box
         .editor-card.q-text-card
-          h4 Giải thích chi tiết đáp án
-          RichTextEditor(v-model="question.text" placeholder="Nhập phần giải thích tại sao chọn đáp án này, từ vựng liên quan...")
+          h4 Giải thích riêng cho câu hỏi này
+          RichTextEditor(v-model="question.explanation" placeholder="Giải thích lý do")
         .editor-card.options-card.mt-4
-          h4 Đáp án
+          h4 Cấu hình đáp án
           .options-grid
             .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
               button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
@@ -141,42 +141,42 @@
 
     template(v-if="partNumber === 7")
       .shared-context-box(v-if="isFirstInGroup")
-        h3.shared-title Đọc hiểu
+        h3.shared-title Khối tài liệu đọc hiểu
         .passage-items-list
           .passage-item-card(v-for="(passage, pIdx) in getSafeArray(question, 'passages')" :key="'p' + pIdx")
             .passage-item-header
-              span.passage-label Đoạn {{ pIdx + 1 }}
+              span.passage-label Khối thông tin văn bản {{ pIdx + 1 }}
               button.btn-remove-passage(v-if="question.passages && question.passages.length > 1" type="button" @click="$emit('remove-array-item', 'passages', pIdx)") ×
             .passage-item-body
               .text-passage-wrapper(v-if="passage.type === 'text'")
                 div
-                  RichTextEditor(v-model="passage.content" placeholder="Nhập nội dung tài liệu...")
+                  RichTextEditor(v-model="passage.content" placeholder="Trình bày chi tiết văn bản tài liệu...")
               .image-passage-wrapper(v-else-if="passage.type === 'image'")
                 .preview-container(v-if="passage.url")
                   img.preview-img(:src="passage.url")
                   button.btn-remove-media(type="button" @click="passage.url = ''") ×
                 .upload-box.image-box(v-else)
-                  input.media-input(v-model="passage.url" placeholder="URL ảnh")
+                  input.media-input(v-model="passage.url" placeholder="Nhập đường dẫn hình ảnh tài liệu...")
         .passage-action-bar
           button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'text')") + Thêm Văn Bản
           button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'image')") + Thêm Hình Ảnh
 
       .shared-context-box(v-if="isFirstInGroup")
-        h3.shared-title Giải thích / Transcript
+        h3.shared-title Giải nghĩa tài liệu / Transcript (Bảo mật)
         .passage-items-list
           .passage-item-card(v-for="(transcript, tIdx) in getSafeArray(question, 'transcripts')" :key="'t' + tIdx")
             .passage-item-header
-              span.passage-label Đoạn {{ tIdx + 1 }}
+              span.passage-label Khối giải nghĩa {{ tIdx + 1 }}
               button.btn-remove-passage(v-if="question.transcripts && question.transcripts.length > 1" type="button" @click="$emit('remove-array-item', 'transcripts', tIdx)") ×
             .passage-item-body
               .text-passage-wrapper(v-if="transcript.type === 'text'")
-                RichTextEditor(v-model="transcript.content" placeholder="Nhập bản dịch hoặc giải thích chung...")
+                RichTextEditor(v-model="transcript.content" placeholder="Trình bày bản dịch tương ứng của tài liệu...")
               .image-passage-wrapper(v-else-if="transcript.type === 'image'")
                 .preview-container(v-if="transcript.url")
                   img.preview-img(:src="transcript.url")
                   button.btn-remove-media(type="button" @click="transcript.url = ''") ×
                 .upload-box.image-box(v-else)
-                  input.media-input(v-model="transcript.url" placeholder="URL ảnh")
+                  input.media-input(v-model="transcript.url" placeholder="Nhập đường dẫn hình ảnh bản dịch...")
         .passage-action-bar
           button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'transcripts', 'text')") + Thêm Văn Bản
           button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'transcripts', 'image')") + Thêm Hình Ảnh
@@ -185,13 +185,13 @@
         .shared-context-box.mb-4
           .top-row-grid
             .editor-card.q-text-card
-              h4 Câu hỏi
-              RichTextEditor(v-model="question.text" placeholder="Nhập câu hỏi đọc hiểu...")
+              h4 Văn bản câu hỏi
+              RichTextEditor(v-model="question.text" placeholder="Nhập văn bản hiển thị câu hỏi đọc hiểu...")
             .editor-card.explanation-card
               h4 Giải thích chi tiết đáp án
-              RichTextEditor(v-model="question.explanation" placeholder="Nhập giải thích cho câu hỏi này...")
+              RichTextEditor(v-model="question.explanation" placeholder="Trình bày chi tiết lý do và vị trí thông tin trong tài liệu...")
         .editor-card.options-card
-          h4 Đáp án
+          h4 Cấu hình đáp án
           .options-grid
             .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
               button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
@@ -200,7 +200,7 @@
     template(v-if="partNumber === 'custom'")
       .setting-type-row.mb-4
         .type-selector
-          label Chọn dạng bài:
+          label Thiết lập định dạng:
           .radio-group
             label.radio-label
               input(type="radio" :name="'q-type-'+question.id" value="multiple_choice" v-model="question.type" @change="onTypeChange(question)")
@@ -213,11 +213,11 @@
               span Ghép cặp
         
         .score-selector
-          label.toggle-switch(title="Bật tính điểm cho câu này")
+          label.toggle-switch(title="Kích hoạt tính điểm")
             input(type="checkbox" v-model="question.scoreEnabled")
             span.slider
-          span.score-label Điểm:
-          //- 🔥 ĐÃ FIX: Dùng hàm máy quét isInvalidScore
+          span.score-label Trọng số điểm:
+          // Kiểm tra trường điểm số hợp lệ
           input.score-input(:class="{ 'invalid-border': question.scoreEnabled && isInvalidScore(question.score) }" v-if="question.scoreEnabled" type="number" v-model="question.score" step="0.5" min="0")
 
       .shared-context-box(v-if="isFirstInGroup")
@@ -225,7 +225,7 @@
         .passage-items-list
           .passage-item-card(v-for="(passage, pIdx) in getSafeArray(question, 'passages')" :key="'p' + pIdx")
             .passage-item-header
-              span.passage-label Đoạn {{ pIdx + 1 }}
+              span.passage-label Khối tài liệu {{ pIdx + 1 }}
               button.btn-remove-passage(v-if="question.passages && question.passages.length > 1" type="button" @click="$emit('remove-array-item', 'passages', pIdx)") ×
             .passage-item-body
               .text-passage-wrapper(v-if="passage.type === 'text'")
@@ -235,26 +235,26 @@
                   img.preview-img(:src="passage.url")
                   button.btn-remove-media(type="button" @click="passage.url = ''") ×
                 .upload-box.image-box(v-else)
-                  input.media-input(v-model="passage.url" placeholder="URL ảnh")
+                  input.media-input(v-model="passage.url" placeholder="Nhập đường dẫn hình ảnh tài liệu...")
         .passage-action-bar
-          button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'text')") + Thêm Đoạn Văn Bản
-          button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'image')") + Thêm Hình Ảnh
+          button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'text')") + Chèn Văn Bản
+          button.btn-add-item-mini(type="button" @click="$emit('add-array-item', 'passages', 'image')") + Chèn Hình Ảnh
 
       .question-content-box
         .shared-context-box.mb-4(style="background: #e0f2fe; border-color: #bfdbfe;")
           .top-row-grid
             .editor-card.q-text-card
               h4 Nội dung câu hỏi
-              RichTextEditor(v-model="question.text" placeholder="Nhập câu hỏi chi tiết...")
+              RichTextEditor(v-model="question.text" placeholder="Trình bày chi tiết yêu cầu câu hỏi...")
             .editor-card.explanation-card
               h4 Giải thích chi tiết đáp án
-              RichTextEditor(v-model="question.explanation" placeholder="Nhập giải thích cho câu hỏi này...")
+              RichTextEditor(v-model="question.explanation" placeholder="Trình bày lý do từ khóa là lựa chọn chính xác...")
 
         template(v-if="question.type === 'multiple_choice'")
           .editor-card.options-card
             .options-header-flex
-              h4 Danh sách lựa chọn đáp án
-              button.btn-add-opt-mini(type="button" @click="question.options.push('')") + Thêm đáp án C,D,E,...
+              h4 Cấu trúc lựa chọn
+              button.btn-add-opt-mini(type="button" @click="question.options.push('')") + Bổ sung biến thể
             .options-grid
               .option-row(v-for="(opt, oIdx) in question.options" :key="oIdx" :class="{ 'correct-row': question.correctAnswer === getOptionLabel(oIdx) }")
                 button.btn-select-correct(type="button" :class="{ 'is-correct': question.correctAnswer === getOptionLabel(oIdx) }" @click="question.correctAnswer = getOptionLabel(oIdx)") {{ getOptionLabel(oIdx) }}
@@ -264,28 +264,28 @@
         template(v-else-if="question.type === 'matching'")
           .editor-card.matching-card
             .options-header-flex
-              h4 Cấu hình cặp ghép nối
+              h4 Ghép cặp
               button.btn-add-opt-mini(type="button" @click="question.pairs.push({left: '', right: ''})") + Thêm cặp
             .matching-grid
               .matching-row(v-for="(pair, pIdx) in question.pairs" :key="pIdx")
-                //- 🔥 ĐÃ FIX: Dùng hàm máy quét isInvalidText
+                // Kiểm tra trường dữ liệu rỗng
                 input.text-field-input.flex-1(:class="{ 'invalid-border': isInvalidText(pair.left) }" v-model.trim="pair.left" placeholder="Vế trái *")
                 span.match-icon ↔
                 input.text-field-input.flex-1(:class="{ 'invalid-border': isInvalidText(pair.right) }" v-model.trim="pair.right" placeholder="Vế phải *")
-                button.btn-remove-opt-cross.relative-cross(v-if="question.pairs.length > 2" type="button" @click="question.pairs.splice(pIdx, 1)") ×
+                button.btn-remove-opt-cross.relative-cross(v-if="question.pairs.length > 2" type="button" @click="question.pairs.splice(pIdx, 1)") x
 
         template(v-else)
           .editor-card.short-answer-card
-            h4 Cấu hình đáp án điền từ
+            h4 Thiết lập hệ số tự luận
             .grid-2
               .input-field-group
-                label Từ khóa chính xác 
+                label Biến chuẩn đánh giá 
                   span.required-star *
-                //- 🔥 ĐÃ FIX: Dùng hàm máy quét isInvalidText
-                input.text-field-input(:class="{ 'invalid-border': isInvalidText(question.correctAnswer) }" v-model.trim="question.correctAnswer" placeholder="Ví dụ: transformation")
+                // Kiểm tra trường dữ liệu rỗng
+                input.text-field-input(:class="{ 'invalid-border': isInvalidText(question.correctAnswer) }" v-model.trim="question.correctAnswer" placeholder="Khởi tạo từ khóa chính xác...")
               .input-field-group
-                label Placeholder hiển thị (Nếu có)
-                input.text-field-input(v-model="question.textPlaceholder" placeholder="Ví dụ: Nhập một danh từ...")
+                label Dữ liệu mẫu (Văn bản chìm)
+                input.text-field-input(v-model="question.textPlaceholder" placeholder="Văn bản định hướng cho vùng nhập liệu...")
 </template>
 
 <script setup lang="ts">
@@ -314,9 +314,7 @@ const autoResize = (event: Event) => {
   target.style.height = target.scrollHeight + 'px'; 
 };
 
-// ==========================================
-// 🔥 HÀM MÁY QUÉT KHOẢNG TRẮNG CHỐNG LỖI UI
-// ==========================================
+// Kiểm tra dữ liệu rỗng -> ko lưu DB
 const isInvalidText = (val: any) => {
   return !val || String(val).trim() === '';
 };

@@ -1,8 +1,5 @@
 <template lang="pug">
 .builder-layout(ref="builderLayoutRef")
-  // ==========================================
-  // THANH CÔNG CỤ TOÀN CỤC (TOPBAR)
-  // ==========================================
   HeaderControl(
     :builderMode="builderMode"
     :isFullscreen="isFullscreen"
@@ -15,16 +12,10 @@
     @save-data="saveDataToDB"
   )
 
-  // ==========================================
-  // KHU VỰC SOẠN ĐỀ THI
-  // ==========================================
   .main-body
-    // CỘT TRÁI: CẤU TRÚC ĐỀ THI
     aside.sidebar
-      // CẤU HÌNH THỜI GIAN/ĐÁP ÁN VÀ AUDIO
       SettingPanel(v-model="examSettings")
       
-      // DIỆN MẠO 1: SIDEBAR TRUYỀN THỐNG (7 PARTS)
       .tree-view(v-if="builderMode === 'traditional'")
         .part-group(v-for="part in 7" :key="part")
           .part-header(:class="{ active: currentPart === part }" @click="currentPart = part")
@@ -43,7 +34,7 @@
               @drop="onDropSidebar(part, index)"
               @dragend="dragSidebarSource = null"
               @click="selectQuestionFromSidebar(part, q.id)"
-              title="Kéo để đổi thứ tự"
+              title="Kéo để hoán đổi vị trí"
             )
               span {{ getGlobalNumber(part, index) }}
               button.btn-del-mini(@click.stop="deleteQuestion(part, index)" title="Xóa câu hỏi") ×
@@ -51,7 +42,6 @@
             .sub-q-item.add-box(@click="addNewQuestionFromSidebar(part)" title="Thêm câu hỏi")
               span +
               
-      // DIỆN MẠO 2: SIDEBAR TÙY CHỈNH
       .tree-view(v-else)
         .part-group(v-for="(pCustom, pIdx) in (examData.custom || [])" :key="pCustom.id")
           .part-header(:class="{ active: currentCustomPartId === pCustom.id }" @click="currentCustomPartId = pCustom.id")
@@ -78,17 +68,16 @@
               @drop="onDropSidebar(pCustom.id, index)"
               @dragend="dragSidebarSource = null"
               @click="selectQuestionFromSidebar(pCustom.id, q.id)"
-              title="Kéo để đổi thứ tự"
+              title="Kéo để hoán đổi vị trí"
             )
               span {{ getCustomGlobalNumber(pCustom.id, index) }}
-              button.btn-del-mini(@click.stop="deleteQuestion(pCustom.id, index)" title="Xóa câu hỏi") ×
+              button.btn-del-mini(@click.stop="deleteQuestion(pCustom.id, index)" title="Xóa câu hỏi") x
             
             .sub-q-item.add-box(@click="addNewQuestionFromSidebar(pCustom.id)" title="Thêm câu hỏi")
               span +
 
-        button.btn-add-custom-part(@click="openPartNameModal(null)") + Thêm phần thi
+        button.btn-add-custom-part(@click="openPartNameModal(null)") Thêm phần thi
 
-    // CỘT PHẢI: WORKSPACE
     main.workspace
       template(v-if="builderMode === 'traditional'")
         .global-audio-bar(v-if="currentPart <= 4")
@@ -101,7 +90,7 @@
                 input.global-audio-input(
                   v-model="tempGlobalAudioUrl" 
                   @keyup.enter="applyGlobalAudioUrl"
-                  placeholder="Url audio bài nghe..."
+                  placeholder="Đường dẫn tệp âm thanh..."
                 )
                 button.btn-apply(v-if="tempGlobalAudioUrl" @click="applyGlobalAudioUrl") Áp dụng
 
@@ -131,7 +120,6 @@
           h2 Chọn hoặc tạo phần thi mới
           p Chọn phần thi từ danh sách bên trái hoặc chọn "Thêm phần thi" để bắt đầu.
 
-  // MODALS TẬP TRUNG
   .modal-overlay(v-if="confirmModal.isOpen" @click.self="closeModal")
     .custom-modal
       h3.modal-title Thông báo
@@ -139,10 +127,10 @@
       
       label.checkbox-label(v-if="confirmModal.type !== 'mode' && confirmModal.type !== 'alert'")
         input(type="checkbox" v-model="confirmModal.dontShowAgain")
-        span Không hiển thị lại
+        span Không hiển thị lại thông báo này
       
       .modal-actions
-        button.btn-cancel(v-if="confirmModal.type !== 'alert'" @click="closeModal") Hủy bỏ
+        button.btn-cancel(v-if="confirmModal.type !== 'alert'" @click="closeModal") Hủy
         button.btn-confirm(:class="{ 'btn-danger': confirmModal.type === 'mode' || confirmModal.type === 'delete' }" @click="executePendingAction") {{ confirmModal.type === 'alert' ? 'Đóng' : 'Xác nhận' }}
 
   .modal-overlay(v-if="partNameModal.isOpen" @click.self="closePartNameModal")
@@ -152,23 +140,21 @@
         input.text-input(v-model="partNameModal.inputName" placeholder="Nhập tên phần thi..." @keyup.enter="savePartName" @input="partNameModal.error = ''")
         p.error-text(v-if="partNameModal.error") {{ partNameModal.error }}
       .modal-actions.mt-4
-        button.btn-cancel(@click="closePartNameModal") Hủy bỏ
+        button.btn-cancel(@click="closePartNameModal") Hủy
         button.btn-confirm(@click="savePartName") Lưu
 
-  //- 🔥 MODAL XUẤT DỮ LIỆU BYPASS SANDBOX (CHUỘT PHẢI)
   .modal-overlay(v-if="exportModal.isOpen" @click.self="closeExportModal")
     .custom-modal.export-modal
-      h3.modal-title 🎉 Tệp tin đã sẵn sàng!
+      h3.modal-title Tệp tin đã sẵn sàng
       .instruction-box
-        p Do chính sách bảo mật Sandbox của Open edX, tính năng tự động tải bị vô hiệu hóa.
-        p 👉 Hãy <b>CLICK CHUỘT PHẢI</b> vào nút bên dưới và chọn <b>"Save link as..." (Lưu liên kết thành...)</b> để tải file về máy.
+        p <b>CLICK CHUỘT PHẢI</b> và chọn <b>"Save link as..."</b> để tải dữ liệu.
       
       .download-action-area
         a.btn-download-massive(
           :href="exportModal.dataUri" 
           :download="exportModal.filename"
           title="Click Chuột Phải -> Save link as..."
-        ) 📥 CHUỘT PHẢI -> SAVE LINK AS...
+        ) Tải Xuống
       
       .input-wrapper.mt-3
         textarea.text-input.export-textarea(readonly v-model="exportModal.content" @focus="$event.target.select()")
@@ -176,7 +162,6 @@
         button.btn-cancel(@click="closeExportModal") Đóng
         button.btn-confirm(@click="copyExportData") {{ copyButtonText }}
 
-  // THẺ INPUT ẨN NHẬN FILE (Được gọi qua Ref)
   input(type="file" ref="fileInputJson" style="display: none" accept=".json" @change="processJSONFile")
   input(type="file" ref="fileInputGift" style="display: none" accept=".txt" @change="processGIFTFile")
 </template>
@@ -185,15 +170,20 @@
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { useExamStore } from '../../store/examStore';
 
+// Modules Giao Diện
 import HeaderControl from '../../components/layout/HeaderControl.vue';
 import SettingPanel from '../../components/modules/SettingPanel.vue';
 import QuestionBoard from '../../components/modules/QuestionBoard.vue';
-import CustomModeEditor from './editors/CustomModeEditor.vue';
+import CustomModeEditor from './CustomModeEditor.vue';
 
-import { generateExportJSON, parseImportJSON, generateExportGIFT, parseImportGIFT } from '../../utils/data_parser';
+// Composables Tách Lớp Nghiệp Vụ
+import { useExamImportExport } from '../../composables/useExamImportExport';
+import { useExamQuestions } from '../../composables/useExamQuestions';
+import { useExamSave } from '../../composables/useExamSave';
 
 const store = useExamStore();
 
+// Khởi tạo trạng thái ban đầu
 const builderMode = ref<'traditional' | 'custom'>('traditional');
 const examSettings = ref({ globalListeningAudio: '', isTimeLimitEnabled: false, isShowAnswerEnabled: true, isAudioSeekEnabled: false, timeLimitSeconds: 7200 });
 const examData = ref<Record<string | number, any>>({ 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], custom: [] });
@@ -202,27 +192,20 @@ const currentPart = ref(1);
 const currentCustomPartId = ref<string | null>(null);
 const tempGlobalAudioUrl = ref('');
 
-const fileInputJson = ref<HTMLInputElement | null>(null);
-const fileInputGift = ref<HTMLInputElement | null>(null);
-
 const sessionConfig = ref({ skipDeleteConfirm: false, skipSwapConfirm: false });
 const builderLayoutRef = ref<HTMLElement | null>(null);
 const isFullscreen = ref(false);
 
 const currentCustomPart = computed({
-  get() {
-    return examData.value?.custom?.find((p: any) => p.id === currentCustomPartId.value) || null;
-  },
+  get() { return examData.value?.custom?.find((p: any) => p.id === currentCustomPartId.value) || null; },
   set(newValue) {
     if (!examData.value?.custom || !newValue) return;
     const index = examData.value.custom.findIndex((p: any) => p.id === currentCustomPartId.value);
-    if (index !== -1) {
-      examData.value.custom[index] = newValue;
-    }
+    if (index !== -1) examData.value.custom[index] = newValue;
   }
 });
 
-// Dropdown & Modals
+// Trạng thái cục bộ điều khiển giao diện (Dropdown & Modal)
 const activeDropdown = ref<string | null>(null);
 const toggleDropdown = (id: string) => { activeDropdown.value = activeDropdown.value === id ? null : id; };
 const closeDropdown = () => { activeDropdown.value = null; };
@@ -272,12 +255,27 @@ const savePartName = () => {
 const deleteCustomPart = (index: number) => {
   const targetPart = examData.value?.custom?.[index];
   if(!targetPart) return;
-  openModal(`Xác nhận xóa phần thi <b>"${targetPart.name}"</b> và toàn bộ câu hỏi trực thuộc?`, 'mode', () => {
+  openModal(`Xác nhận xóa phần thi <b>"${targetPart.name}"</b> và toàn bộ câu hỏi bên trong?`, 'mode', () => {
     if (currentCustomPartId.value === targetPart.id) currentCustomPartId.value = null;
     examData.value.custom.splice(index, 1);
   });
 };
 
+// Liên kết các Composables
+const {
+  fileInputJson, fileInputGift, exportModal, copyButtonText, closeExportModal, 
+  copyExportData, exportDataJSON, triggerImportJSON, processJSONFile, 
+  exportDataGIFT, triggerImportGIFT, processGIFTFile
+} = useExamImportExport(examData, examSettings, builderMode, currentCustomPartId, tempGlobalAudioUrl, openModal);
+
+const {
+  dragSidebarSource, getGlobalNumber, getCustomGlobalNumber, onDragStartSidebar, 
+  onDropSidebar, addNewQuestionFromSidebar, deleteQuestion, handlePartEditorDelete, handlePartEditorSwap
+} = useExamQuestions(examData, currentCustomPartId, openModal);
+
+const { saveDataToDB } = useExamSave(examData, examSettings, builderMode, openModal);
+
+// Đồng bộ trạng thái Pinia
 watch(() => store.isLoading, (isLoading) => {
   if (!isLoading) { 
     builderMode.value = store.builderMode || 'traditional';
@@ -298,8 +296,9 @@ watch(() => store.isLoading, (isLoading) => {
   }
 }, { immediate: true });
 
-const handleOffline = () => { openModal('Mất kết nối mạng. Đừng lo, toàn bộ tiến trình của bạn đang được tự động lưu an toàn trên máy ảo.', 'alert'); };
-const handleOnline = () => { openModal('Đã kết nối mạng trở lại. Hệ thống đang tự động đồng bộ dữ liệu lên máy chủ...', 'alert'); saveDataToDB(); };
+// Xử lý sự kiện ngoại tuyến
+const handleOffline = () => { openModal('Mất kết nối mạng', 'alert'); };
+const handleOnline = () => { openModal('Đã kết nối mạng trở lại', 'alert'); saveDataToDB(); };
 
 onMounted(() => { 
   document.addEventListener('click', closeDropdown); 
@@ -326,63 +325,6 @@ const handleModeSwitch = (mode: 'traditional' | 'custom') => {
     tempGlobalAudioUrl.value = '';
   });
 };
-
-const saveDataToDB = async () => { 
-  let isValid = true;
-  let errorMsg = '';
-  
-  const validateCommonQuestion = (q: any) => {
-    if ((!q.type || q.type === 'multiple_choice') && !q.correctAnswer) { isValid = false; errorMsg = 'Có câu trắc nghiệm bị trống đáp án đúng.'; }
-    if (q.type === 'text_input' && !q.correctAnswer) { isValid = false; errorMsg = 'Có câu điền từ bị trống từ khóa chính xác.'; }
-    if (q.type === 'matching' && (!q.pairs || q.pairs.length === 0 || q.pairs.some((p: any) => !p.left || !p.right))) { isValid = false; errorMsg = 'Có câu ghép cặp chưa điền đủ các vế trái/phải.'; }
-    if (q.scoreEnabled && (typeof q.score !== 'number' || q.score < 0)) { isValid = false; errorMsg = 'Điểm số không được là số âm.'; }
-  };
-
-  if (builderMode.value === 'traditional') {
-    for (let p = 1; p <= 7; p++) {
-      for (const q of (examData.value[p] || [])) {
-        validateCommonQuestion(q);
-      }
-    }
-  } else {
-    for (const part of (examData.value.custom || [])) {
-      for (const q of (part.questions || [])) {
-        validateCommonQuestion(q);
-      }
-    }
-  }
-
-  if (!isValid) {
-    openModal(`<b>Không thể lưu đề thi:</b><br>${errorMsg}<br><br>Vui lòng điền đủ các trường bắt buộc (Chìa khóa đáp án, Ghép cặp, Điểm số >= 0) trước khi thực hiện Lưu đề thi.`, 'alert');
-    return;
-  }
-
-  try {
-    const payloadData: Record<string | number, any> = {};
-    if (builderMode.value === 'traditional') {
-      for (let p = 1; p <= 7; p++) {
-        if (examData.value[p]) payloadData[p] = examData.value[p];
-      }
-    } else {
-      if (examData.value.custom) payloadData.custom = examData.value.custom;
-    }
-
-    const payload = { 
-      examSettings: examSettings.value, 
-      examData: payloadData, 
-      builderMode: builderMode.value 
-    };
-
-    await store.saveToEdx(payload);
-    openModal('Lưu đề thi vào hệ thống thành công.', 'alert');
-  } catch (error) {
-    openModal('Lỗi kết nối. Không thể lưu dữ liệu trực tiếp, bản lưu nháp nội bộ vẫn an toàn.', 'alert');
-  }
-};
-
-// ==========================================
-// 5. CÁC HÀM XỬ LÝ KÉO THẢ, FULLSCREEN, XUẤT NHẬP DỮ LIỆU... 
-// ==========================================
 
 const toggleFullscreen = () => {
   const appContainer = document.querySelector('.builder-layout');
@@ -418,17 +360,7 @@ const applyGlobalAudioUrl = () => { if (tempGlobalAudioUrl.value.trim() !== '') 
 const editorMap: Record<number, any> = { 1: QuestionBoard, 2: QuestionBoard, 3: QuestionBoard, 4: QuestionBoard, 5: QuestionBoard, 6: QuestionBoard, 7: QuestionBoard };
 const currentEditorComponent = computed(() => editorMap[currentPart.value]);
 
-const getGlobalNumber = (targetPart: number, localIndex: number) => { let count = 0; for (let p = 1; p < targetPart; p++) { count += (examData.value?.[p]?.length || 0); } return count + localIndex + 1; };
 const currentPartStartNumber = computed(() => { let count = 0; for (let p = 1; p < currentPart.value; p++) { count += (examData.value?.[p]?.length || 0); } return count + 1; });
-
-const getCustomGlobalNumber = (targetPartId: string, localIndex: number) => {
-  let count = 0;
-  for (const p of (examData.value?.custom || [])) {
-    if (p.id === targetPartId) return count + localIndex + 1;
-    count += (p.questions?.length || 0);
-  }
-  return count + localIndex + 1;
-};
 const currentCustomPartStartNumber = computed(() => {
   if (!currentCustomPartId.value) return 1;
   let count = 0;
@@ -439,379 +371,10 @@ const currentCustomPartStartNumber = computed(() => {
   return 1;
 });
 
-const dragSidebarSource = ref<{part: string | number, index: number} | null>(null);
-
-const onDragStartSidebar = (part: string | number, index: number, event: DragEvent) => { dragSidebarSource.value = { part, index }; if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; };
-
-const onDropSidebar = (targetPart: string | number, targetIndex: number) => { 
-  if (!dragSidebarSource.value) return; 
-  const { part: sourcePart, index: sourceIndex } = dragSidebarSource.value; 
-  if (sourcePart === targetPart && sourceIndex !== targetIndex) { 
-    const labelSource = typeof sourcePart === 'number' ? getGlobalNumber(sourcePart, sourceIndex) : getCustomGlobalNumber(sourcePart as string, sourceIndex);
-    const labelTarget = typeof targetPart === 'number' ? getGlobalNumber(targetPart as number, targetIndex) : getCustomGlobalNumber(targetPart as string, targetIndex);
-
-    const isCustom = typeof sourcePart === 'string';
-    const isContentSwap = isCustom || (typeof sourcePart === 'number' && sourcePart >= 6);
-    const actionText = isContentSwap ? 'nội dung' : 'vị trí';
-
-    openModal(`Xác nhận hoán đổi ${actionText} câu ${labelSource} và câu ${labelTarget}?`, 'swap', () => {
-      let list: any[];
-      if (isCustom) {
-        const targetPartObj = examData.value?.custom?.find((p: any) => p.id === sourcePart);
-        if (!targetPartObj) return;
-        list = targetPartObj.questions;
-      } else {
-        list = examData.value[sourcePart as number];
-      }
-
-      if (isContentSwap) {
-        const item1 = list[sourceIndex];
-        const item2 = list[targetIndex];
-        
-        const sourceId = item1.id;
-        const sourceGroupId = item1.groupId;
-        const targetId = item2.id;
-        const targetGroupId = item2.groupId;
-
-        const temp = { ...item1 };
-        Object.assign(item1, item2);
-        item1.id = sourceId; item1.groupId = sourceGroupId;
-
-        Object.assign(item2, temp);
-        item2.id = targetId; item2.groupId = targetGroupId;
-      } else {
-        const temp = list[sourceIndex]; 
-        list[sourceIndex] = list[targetIndex]; 
-        list[targetIndex] = temp;
-      }
-
-      if (!isCustom) rebalanceContextsUniversal(list, sourcePart);
-    });
-  } 
-  dragSidebarSource.value = null; 
-};
-
-const addNewQuestionFromSidebar = (part: string | number) => { 
-  if (typeof part === 'number') {
-    const initialOptions = part === 2 ? ['', '', ''] : ['', '', '', '']; 
-    const newId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    let groupId = '';
-    
-    if ([3, 4, 6, 7].includes(part)) {
-      const list = examData.value[part];
-      groupId = list && list.length > 0 
-        ? String(list[list.length - 1].groupId) 
-        : `group_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    }
-
-    const newQ: any = { id: newId, type: 'multiple_choice', text: '', content: '', options: initialOptions, correctAnswer: 'A', explanation: '' };
-    if (groupId) newQ.groupId = groupId;
-    examData.value[part].push(newQ); 
-  } else {
-    const targetPartObj = examData.value?.custom?.find((p: any) => p.id === part);
-    if (!targetPartObj) return;
-
-    const lastGroupId = targetPartObj.questions?.length > 0 
-      ? String(targetPartObj.questions[targetPartObj.questions.length - 1].groupId) 
-      : `group_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    const newQ = { 
-      id: `q_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, 
-      groupId: lastGroupId, type: 'multiple_choice', text: '', content: '', sharedContext: '', 
-      options: ['', ''], pairs: [], correctAnswer: 'A', explanation: '', 
-      scoreEnabled: false, score: 1, textPlaceholder: ''
-    };
-    targetPartObj.questions.push(newQ);
-  }
-};
-
 const selectQuestionFromSidebar = (part: string | number, qId: string) => { 
   if (typeof part === 'number') { currentPart.value = part; } else { currentCustomPartId.value = part; }
   nextTick(() => { const el = document.getElementById(`question-${qId}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); 
 };
-
-const deleteQuestion = (part: string | number, index: number) => { 
-  const label = typeof part === 'number' ? getGlobalNumber(part, index) : getCustomGlobalNumber(part as string, index);
-  openModal(`Xác nhận xóa câu hỏi số ${label}?`, 'delete', () => { 
-    if (typeof part === 'number') {
-      examData.value[part].splice(index, 1);
-      rebalanceContextsUniversal(examData.value[part], part);
-    } else {
-      const targetPartObj = examData.value?.custom?.find((p: any) => p.id === part);
-      if (targetPartObj) {
-         const q = targetPartObj.questions[index];
-         if (q.sharedContext && index + 1 < targetPartObj.questions.length && targetPartObj.questions[index + 1].groupId === q.groupId) {
-             targetPartObj.questions[index + 1].sharedContext = q.sharedContext;
-         }
-         targetPartObj.questions.splice(index, 1);
-      }
-    }
-  });
-};
-
-// ==========================================
-// 🔥 ĐÃ FIX: SỬ DỤNG BLOB URL + CLICK CHUỘT PHẢI
-// ==========================================
-const exportModal = ref({ isOpen: false, content: '', filename: '', dataUri: '' });
-const copyButtonText = ref('📋 Sao chép');
-const closeExportModal = () => { 
-  exportModal.value.isOpen = false; 
-  copyButtonText.value = '📋 Sao chép'; 
-  if (exportModal.value.dataUri) {
-    URL.revokeObjectURL(exportModal.value.dataUri);
-  }
-};
-
-const copyExportData = () => {
-  const content = exportModal.value.content;
-  const showSuccess = () => { copyButtonText.value = '✔️ Đã sao chép thành công!'; setTimeout(() => { copyButtonText.value = '📋 Sao chép'; }, 3000); };
-  const showError = () => { copyButtonText.value = '❌ Bị chặn! Hãy bôi đen thủ công'; setTimeout(() => { copyButtonText.value = '📋 Sao chép'; }, 3000); };
-
-  const fallbackCopyTextToClipboard = (text: string) => {
-    const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.top = "-9999px"; textArea.style.left = "-9999px";
-    document.body.appendChild(textArea); textArea.focus(); textArea.select();
-    try { const successful = document.execCommand('copy'); if (successful) showSuccess(); else showError(); } catch (err) { showError(); }
-    document.body.removeChild(textArea);
-  };
-
-  if (!navigator.clipboard || !navigator.clipboard.writeText) { fallbackCopyTextToClipboard(content); return; }
-  navigator.clipboard.writeText(content).then(() => { showSuccess(); }).catch(() => { fallbackCopyTextToClipboard(content); });
-};
-
-// Sử dụng Blob giúp vượt rào URL length, click chuột phải "Save link as" sẽ thả thẳng file nguyên vẹn
-const downloadFile = (content: string, filename: string, mimeType: string) => {
-  const utf8BOM = "\uFEFF"; 
-  const finalContent = utf8BOM + content;
-
-  const blob = new Blob([finalContent], { type: mimeType });
-  const blobUrl = URL.createObjectURL(blob);
-
-  exportModal.value = { 
-    isOpen: true, 
-    content: content,
-    filename: filename,
-    dataUri: blobUrl
-  };
-};
-
-const exportDataJSON = () => {
-  const dataStr = generateExportJSON(examData.value, examSettings.value, builderMode.value);
-  downloadFile(dataStr, `exam_${builderMode.value}_data.json`, 'application/json');
-};
-
-const triggerImportJSON = () => { fileInputJson.value?.click(); };
-
-const processJSONFile = (event: Event) => {
-  const inputEl = event.target as HTMLInputElement;
-  const file = inputEl.files?.[0]; if (!file) return;
-
-  if (!file.name.toLowerCase().endsWith('.json')) {
-    openModal('Tệp tin không đúng định dạng. Hệ thống chế độ JSON chỉ chấp nhận tệp có đuôi mở rộng <span style="color:#ef4444;font-weight:bold;">.json</span>.', 'alert');
-    inputEl.value = '';
-    return;
-  }
-
-  const doImport = () => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = parseImportJSON(e.target?.result as string);
-      if (result.success && result.data) {
-        examData.value = result.data;
-        if (result.settings) examSettings.value = { ...examSettings.value, ...result.settings };
-        if (result.mode) builderMode.value = result.mode as 'traditional' | 'custom';
-        tempGlobalAudioUrl.value = '';
-        if (builderMode.value === 'custom' && examData.value.custom?.length > 0) { currentCustomPartId.value = examData.value.custom[0].id; }
-        openModal('Nhập dữ liệu JSON thành công.', 'alert');
-      } else {
-        openModal(result.error || 'Lỗi định dạng file JSON.', 'alert');
-      }
-    }; 
-    reader.readAsText(file);
-  };
-
-  const hasData = Object.values(examData.value || {}).some((arr: any) => arr && arr.length > 0) || examSettings.value?.globalListeningAudio !== '';
-  if (hasData) {
-    openModal(`Việc nhập dữ liệu mới sẽ ghi đè toàn bộ nội dung hiện tại. Xác nhận tiếp tục?`, 'mode', doImport);
-  } else {
-    doImport();
-  }
-  inputEl.value = '';
-};
-
-const exportDataGIFT = () => {
-  const giftText = generateExportGIFT(examData.value, examSettings.value, builderMode.value);
-  if (!giftText.trim()) { openModal('Không có dữ liệu để xuất.', 'alert'); return; }
-  downloadFile(giftText, 'exam_questions.txt', 'text/plain;charset=utf-8');
-};
-
-const triggerImportGIFT = () => { fileInputGift.value?.click(); };
-const processGIFTFile = (event: Event) => {
-  const inputEl = event.target as HTMLInputElement;
-  const file = inputEl.files?.[0]; if (!file) return;
-
-  if (!file.name.toLowerCase().endsWith('.txt')) {
-    openModal('Tệp tin không đúng định dạng. Hệ thống phân tích GIFT chỉ chấp nhận tệp văn bản chuẩn cấu trúc có đuôi mở rộng <span style="color:#ef4444;font-weight:bold;">.txt</span>.', 'alert');
-    inputEl.value = '';
-    return;
-  }
-
-  const doImport = () => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = parseImportGIFT(e.target?.result as string);
-      if (result.success && result.data) {
-        examData.value = result.data;
-        if (result.settings) examSettings.value = { ...examSettings.value, ...result.settings };
-        if (result.mode) builderMode.value = result.mode as 'traditional' | 'custom';
-        tempGlobalAudioUrl.value = '';
-        if (builderMode.value === 'custom' && examData.value.custom?.length > 0) { currentCustomPartId.value = examData.value.custom[0].id; }
-        openModal(`Nhập thành công dữ liệu từ file GIFT.`, 'alert');
-      } else {
-        openModal(result.error || 'Không tìm thấy dữ liệu hợp lệ.', 'alert');
-      }
-    }; 
-    reader.readAsText(file);
-  };
-
-  const hasData = Object.values(examData.value || {}).some((arr: any) => arr && arr.length > 0) || examSettings.value?.globalListeningAudio !== '';
-  if (hasData) {
-    openModal(`Việc nhập dữ liệu mới sẽ ghi đè toàn bộ nội dung hiện tại. Xác nhận tiếp tục?`, 'mode', doImport);
-  } else {
-    doImport();
-  }
-  inputEl.value = '';
-};
-
-const rebalanceContextsUniversal = (partData: any[], partNumber: number | string) => {
-  if (partNumber === 'custom') return; 
-  if ([1, 2, 5].includes(partNumber as number)) return;
-
-  if (partNumber === 3 || partNumber === 4) {
-    for (let i = 0; i < partData.length; i += 3) {
-      let foundImage = ''; let foundContent = '';
-      for (let j = 0; j < 3; j++) {
-        if (partData[i + j]) {
-          if (!foundImage && partData[i + j].image) foundImage = partData[i + j].image;
-          if (!foundContent && partData[i + j].content) foundContent = partData[i + j].content;
-          partData[i + j].image = ''; partData[i + j].content = '';
-        }
-      }
-      if (partData[i]) { partData[i].image = foundImage; partData[i].content = foundContent; }
-    }
-    return;
-  }
-
-  if (partNumber === 6) {
-    for (let i = 0; i < partData.length; i += 4) {
-      let foundContent = ''; let foundImage = '';
-      for (let j = 0; j < 4; j++) {
-        if (partData[i + j]) {
-          if (!foundContent && partData[i + j].content) foundContent = partData[i + j].content;
-          if (!foundImage && partData[i + j].image) foundImage = partData[i + j].image;
-          partData[i + j].content = ''; partData[i + j].image = '';
-        }
-      }
-      if (partData[i]) { partData[i].content = foundContent; partData[i].image = foundImage; }
-    }
-    return;
-  }
-
-  if (partNumber === 7) {
-    const passageMap = new Map();
-    const transcriptMap = new Map();
-    partData.forEach(q => {
-      if (q.passages && q.passages.length > 0) {
-        if (!passageMap.has(q.groupId)) passageMap.set(q.groupId, JSON.parse(JSON.stringify(q.passages)));
-      }
-      delete q.passages; 
-      if (q.transcripts && q.transcripts.length > 0) {
-        if (!transcriptMap.has(q.groupId)) transcriptMap.set(q.groupId, JSON.parse(JSON.stringify(q.transcripts)));
-      }
-      delete q.transcripts; 
-    });
-    partData.forEach((q, index) => {
-      const isLeader = index === 0 || partData[index - 1].groupId !== q.groupId;
-      if (isLeader) {
-        q.passages = passageMap.get(q.groupId) || [{ type: 'text', content: '' }];
-        q.transcripts = transcriptMap.get(q.groupId) || [{ type: 'text', content: '' }];
-      }
-    });
-  }
-};
-
-const handlePartEditorDelete = (payload: { index: number, message: string, partNumber: number | string }) => {
-  openModal(payload.message, 'delete', () => {
-    let list;
-    if (payload.partNumber === 'custom') {
-      const customPart = examData.value?.custom?.find((p: any) => p.id === currentCustomPartId.value);
-      if (!customPart) return;
-      list = customPart.questions;
-    } else {
-      list = examData.value[currentPart.value];
-    }
-    
-    list.splice(payload.index, 1);
-    
-    if (payload.partNumber !== 'custom') {
-      rebalanceContextsUniversal(list, payload.partNumber as number);
-    }
-  });
-};
-
-const handlePartEditorSwap = (payload: { sourceIndex: number, targetIndex: number, message: string, partNumber: number | string }) => {
-  openModal(payload.message, 'swap', () => {
-    let list;
-    if (payload.partNumber === 'custom') {
-      const customPart = examData.value?.custom?.find((p: any) => p.id === currentCustomPartId.value);
-      if (!customPart) return;
-      list = customPart.questions;
-    } else {
-      list = examData.value[currentPart.value]; 
-    }
-
-    if (payload.partNumber === 'custom' || (typeof payload.partNumber === 'number' && payload.partNumber >= 6)) {
-      const item1 = list[payload.sourceIndex];
-      const item2 = list[payload.targetIndex];
-
-      const newItem1 = { ...item2, id: item1.id, groupId: item1.groupId };
-      const newItem2 = { ...item1, id: item2.id, groupId: item2.groupId };
-
-      list.splice(payload.sourceIndex, 1, newItem1);
-      list.splice(payload.targetIndex, 1, newItem2);
-    } else {
-      const temp = list[payload.sourceIndex]; 
-      list[payload.sourceIndex] = list[payload.targetIndex]; 
-      list[payload.targetIndex] = temp;
-    }
-
-    if (payload.partNumber !== 'custom') {
-      rebalanceContextsUniversal(list, payload.partNumber as number);
-    }
-  });
-};
-
-const timeLimitFormatted = computed({
-  get() {
-    const totalSeconds = Number(examSettings.value.timeLimitSeconds) || 0; 
-    const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const secs = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${hrs}:${mins}:${secs}`;
-  },
-  set(val: string) {
-    if (!val) return; 
-    const parts = val.split(':');
-    let hrs = parseInt(parts[0] || '0', 10); 
-    let mins = parts.length >= 2 ? parseInt(parts[1] || '0', 10) : 0; 
-    let secs = parts.length === 3 ? parseInt(parts[2] || '0', 10) : 0;
-    
-    if (isNaN(hrs) || hrs < 0) hrs = 0; 
-    if (isNaN(mins) || mins < 0) mins = 0; 
-    if (isNaN(secs) || secs < 0) secs = 0;
-    
-    examSettings.value.timeLimitSeconds = (hrs * 3600) + (mins * 60) + secs;
-  }
-});
 </script>
 
 <style scoped>
@@ -876,15 +439,10 @@ const timeLimitFormatted = computed({
 .text-input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; box-sizing: border-box; }
 .mt-3 { margin-top: 12px; }
 .mt-4 { margin-top: 16px; }
-
-/* CSS MỚI CHO MODAL EXPORT CÓ NÚT TẢI XUỐNG VẬT LÝ */
 .export-modal { width: 450px; max-width: 90vw; text-align: center; }
-
-/* Thêm css cho bảng hướng dẫn */
 .instruction-box { background: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 8px; margin-bottom: 20px; text-align: left; }
 .instruction-box p { margin: 0 0 8px 0; font-size: 0.9rem; color: #92400e; line-height: 1.5; }
 .instruction-box p:last-child { margin-bottom: 0; font-weight: bold; }
-
 .download-action-area { margin: 20px 0 10px 0; display: flex; justify-content: center; }
 .btn-download-massive { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; background: #10b981; color: white; border-radius: 8px; font-weight: 800; font-size: 1.05rem; text-decoration: none; transition: all 0.3s; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); width: 100%; box-sizing: border-box;}
 .btn-download-massive:hover { background: #059669; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4); }
